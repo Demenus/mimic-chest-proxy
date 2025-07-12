@@ -10,7 +10,7 @@ export { startProxyServer } from './proxy/index.js';
 // Re-export common utilities and services
 export { mimicMappingService } from './MimicMappingService.js';
 export * from './types.js';
-export * from './utils.js';
+export * from './utils/index.js';
 export { logger } from './logger.js';
 
 /**

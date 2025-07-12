@@ -23,9 +23,11 @@
   "dependencies": {
     "@quasar/cli": "^2.5.0",
     "@quasar/extras": "^1.16.4",
+    "@types/http-proxy": "^1.17.17",
     "axios": "^1.2.1",
     "express": "^5.2.1",
     "express-http-proxy": "^2.1.2",
+    "http-mitm-proxy": "^1.1.0",
     "monaco-editor-vue3": "^1.0.5",
     "parse-url": "^10.0.3",
     "pinia": "^3.0.1",

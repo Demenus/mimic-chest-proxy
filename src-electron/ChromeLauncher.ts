@@ -85,10 +85,12 @@ export class ChromeLauncher {
         '--disable-web-security',
         '--disable-features=IsolateOrigins,site-per-process',
         '--user-data-dir=/tmp/chrome-mimic-proxy',
+        '--ignore-certificate-errors', // Ignore SSL certificate errors (for testing with MITM proxy)
+        '--ignore-certificate-errors-spki-list', // Ignore certificate errors for specific SPKI list
       ];
 
       this.chromeProcess = spawn(chromePath, args, {
-        detached: true,
+        detached: false,
         stdio: 'ignore',
       });
 

@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import { mimicMappingService } from '../MimicMappingService.js';
-import { parseContentFromBody } from '../utils.js';
+import { parseContentFromBody } from '../utils/index.js';
 import type {
   CreateMappingRequest,
   CreateMappingResponse,
