@@ -1,10 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
-import { mimicMappingService } from './MimicMappingService.js';
-import { extractTargetUrl } from './utils.js';
+import { mimicMappingService } from '../MimicMappingService.js';
+import { extractTargetUrl } from '../utils.js';
 import { sendMimickedContent } from './contentHandler.js';
 import { handleProxyRequest } from './proxyHandler.js';
-import { logger } from './logger.js';
-import type { MimicMapping } from './types.js';
+import { logger } from '../logger.js';
+import type { MimicMapping } from '../types.js';
 
 /**
  * Determine what action to take for a request

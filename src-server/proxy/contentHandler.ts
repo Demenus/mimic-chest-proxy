@@ -1,7 +1,7 @@
 import type { Response } from 'express';
-import type { MimicMapping } from './types.js';
-import { detectContentType } from './utils.js';
-import { logger } from './logger.js';
+import type { MimicMapping } from '../types.js';
+import { detectContentType } from '../utils.js';
+import { logger } from '../logger.js';
 
 /**
  * Handle response with mimicked content

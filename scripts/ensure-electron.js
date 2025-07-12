@@ -27,3 +27,4 @@ if (fs.existsSync(electronPath) && !fs.existsSync(pathTxt)) {
   }
 }
 
+

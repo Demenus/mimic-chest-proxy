@@ -1,12 +1,12 @@
 import type { Express, Request, Response } from 'express';
-import { mimicMappingService } from './MimicMappingService.js';
-import { parseContentFromBody } from './utils.js';
+import { mimicMappingService } from '../MimicMappingService.js';
+import { parseContentFromBody } from '../utils.js';
 import type {
   CreateMappingRequest,
   CreateMappingResponse,
   UpdateContentResponse,
   ErrorResponse,
-} from './types.js';
+} from '../types.js';
 
 /**
  * Setup all API routes

@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import proxy from 'express-http-proxy';
 import parseUrl from 'parse-url';
-import { logger } from './logger.js';
+import { logger } from '../logger.js';
 
 const PROXY_TIMEOUT = 30000; // 30 seconds
 const PROXY_LIMIT = '50mb';
