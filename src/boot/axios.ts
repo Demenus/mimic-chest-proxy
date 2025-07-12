@@ -14,7 +14,24 @@ declare module 'vue' {
 // good idea to move this instance creation inside of the
 // "export default () => {}" function below (which runs individually
 // for each client)
-const api = axios.create({ baseURL: 'https://api.example.com' });
+
+// Create API instance with dynamic baseURL
+// The baseURL will be set when the mimic server port is available
+const api = axios.create();
+
+// Function to update baseURL when server port is known
+export async function configureMimicApi(): Promise<void> {
+  if (typeof window !== 'undefined' && window.electronAPI) {
+    try {
+      const port = await window.electronAPI.getMimicServerPort();
+      if (port) {
+        api.defaults.baseURL = `http://localhost:${port}`;
+      }
+    } catch (error) {
+      console.error('Failed to get mimic server port:', error);
+    }
+  }
+}
 
 export default defineBoot(({ app }) => {
   // for use inside Vue files (Options API) through this.$axios and this.$api
@@ -26,6 +43,11 @@ export default defineBoot(({ app }) => {
   app.config.globalProperties.$api = api;
   // ^ ^ ^ this will allow you to use this.$api (for Vue Options API form)
   //       so you can easily perform requests against your app's API
+
+  // Configure API baseURL if running in Electron
+  if (typeof window !== 'undefined' && window.electronAPI) {
+    void configureMimicApi();
+  }
 });
 
 export { api };

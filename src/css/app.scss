@@ -1,1 +1,18 @@
 // app global css in SCSS form
+
+// Apply terracotta/earth tones globally
+body {
+  background-color: #cd853f !important; // Peru/light terracotta
+}
+
+body.body--dark {
+  background-color: #cd853f !important;
+}
+
+.q-page-container {
+  background-color: #cd853f !important;
+}
+
+.q-page {
+  background-color: #cd853f !important;
+}
