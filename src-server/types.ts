@@ -30,3 +30,10 @@ export interface ErrorResponse {
   details?: string;
 }
 
+// Extend Express Request to include originalTargetUrl for proxy requests
+declare module 'express-serve-static-core' {
+  interface Request {
+    originalTargetUrl?: string;
+  }
+}
+

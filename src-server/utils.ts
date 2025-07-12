@@ -43,20 +43,45 @@ export function extractTargetUrl(req: Request): string | undefined {
     return `https://${req.url}`;
   }
 
-  // Try to get URL from Host header (for HTTP proxy)
-  const host = req.get('host');
-  if (host) {
-    // Check if it's a proxy request (host might be the target domain)
-    // For proxy requests, the host header contains the target domain
-    const protocol = req.secure ? 'https' : 'http';
-    return `${protocol}://${host}${req.originalUrl || req.url}`;
+  // Check if we stored the original target URL (for HTTP proxy requests)
+  const originalTargetUrl = req.originalTargetUrl;
+  if (originalTargetUrl && (originalTargetUrl.startsWith('http://') || originalTargetUrl.startsWith('https://'))) {
+    return originalTargetUrl;
   }
 
-  // Fallback: try to construct from request
-  if (req.originalUrl) {
-    const protocol = req.secure ? 'https' : req.protocol;
-    const host = req.get('host') || 'localhost';
-    return `${protocol}://${host}${req.originalUrl}`;
+  // For HTTP proxy requests, req.url might already contain the full URL
+  // Check if req.url or req.originalUrl starts with http:// or https://
+  const url = req.originalUrl || req.url || '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
+  // Check if the path starts with /http:// or /https:// (some proxy formats)
+  if (url.startsWith('/http://') || url.startsWith('/https://')) {
+    return url.substring(1); // Remove leading slash
+  }
+
+  // For HTTP proxy requests, when Chrome sends GET http://domain.com/ HTTP/1.1
+  // Express parses it and req.url becomes just the path
+  // We need to reconstruct from the Host header, but Host is the proxy server
+  // So we can't use it. Instead, we need to check if this is an API route
+  const host = req.get('host');
+  if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+    // This is likely a direct request to the proxy API (not a proxy request)
+    // Skip extraction for API routes
+    if (url.startsWith('/api/') || url.startsWith('/health')) {
+      return undefined;
+    }
+
+    // For proxy requests to localhost, we can't determine the target
+    // This shouldn't happen in normal proxy usage
+    return undefined;
+  }
+
+  // If host is not localhost, construct URL from host + path
+  if (host) {
+    const protocol = req.secure ? 'https' : 'http';
+    return `${protocol}://${host}${url}`;
   }
 
   return undefined;

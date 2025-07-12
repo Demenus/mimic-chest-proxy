@@ -27,10 +27,12 @@
     "express": "^5.2.1",
     "express-http-proxy": "^2.1.2",
     "monaco-editor-vue3": "^1.0.5",
+    "parse-url": "^10.0.3",
     "pinia": "^3.0.1",
     "quasar": "^2.16.0",
     "vue": "^3.5.22",
-    "vue-router": "^4.0.12"
+    "vue-router": "^4.0.12",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "@electron/packager": "^18.4.4",
