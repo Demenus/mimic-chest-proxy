@@ -4,7 +4,7 @@ import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import parseUrl from 'parse-url';
 import { setupRoutes } from './routes.js';
-import { createMimicInterceptor } from './middleware.js';
+import { createRequestInterceptor } from './requestHandler.js';
 import { logger } from './logger.js';
 import './types.js'; // Import to register type extensions
 
@@ -51,7 +51,7 @@ export async function startMimicServer(): Promise<number> {
 
   // Middleware to intercept all requests and check for mimic mappings
   // This must be after routes but before any default handlers
-  app.use(createMimicInterceptor());
+  app.use(createRequestInterceptor());
 
   return new Promise((resolve, reject) => {
     server = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -62,14 +62,24 @@ export async function startMimicServer(): Promise<number> {
       if (originalUrl && (originalUrl.startsWith('http://') || originalUrl.startsWith('https://'))) {
         // Store the original URL in a custom property that Express will have access to
         (req as express.Request).originalTargetUrl = originalUrl;
+        logger.info('Received proxy request with full URL', { originalUrl, method: req.method });
         // Extract just the path for Express to parse
         try {
           const urlObj = parseUrl(originalUrl);
-          req.url = urlObj.pathname + (urlObj.search || '');
-          logger.debug('Parsed proxy URL', { originalUrl, pathname: urlObj.pathname, search: urlObj.search });
+          // parse-url returns search without the ?, so we need to add it
+          const search = urlObj.search ? `?${urlObj.search}` : '';
+          req.url = urlObj.pathname + search;
+          logger.info('Parsed proxy URL', {
+            originalUrl,
+            pathname: urlObj.pathname,
+            search: urlObj.search,
+            finalUrl: req.url,
+            protocol: urlObj.protocol,
+            host: urlObj.host || urlObj.resource,
+          });
         } catch (error) {
           // If URL parsing fails, keep original
-          logger.warn('Failed to parse URL', { originalUrl, error });
+          logger.warn('Failed to parse URL', { originalUrl, error: String(error) });
         }
       }
 

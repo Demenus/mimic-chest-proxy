@@ -1,8 +1,6 @@
 <template>
   <div class="mappings-section">
-    <div class="section-description">
-      Click on a mapping to edit its content.
-    </div>
+    <div class="section-description">Click on a mapping to edit its content.</div>
     <q-list v-if="mappings.length > 0" bordered separator class="mappings-list">
       <q-item
         v-for="mapping in mappings"
@@ -17,11 +15,7 @@
           <q-item-label caption>ID: {{ mapping.id }}</q-item-label>
         </q-item-section>
         <q-item-section side>
-          <q-chip
-            :color="mapping.hasContent ? 'positive' : 'grey'"
-            text-color="white"
-            size="sm"
-          >
+          <q-chip :color="mapping.hasContent ? 'positive' : 'grey'" text-color="white" size="sm">
             {{ mapping.hasContent ? 'With content' : 'No content' }}
           </q-chip>
         </q-item-section>
@@ -85,4 +79,3 @@ defineEmits<{
   text-align: center;
 }
 </style>
-

@@ -1,10 +1,5 @@
 import type { Express, Request, Response } from 'express';
-import {
-  createMapping,
-  getMapping,
-  getAllMappings,
-  updateMappingContent,
-} from './storage.js';
+import { mimicMappingService } from './MimicMappingService.js';
 import { parseContentFromBody } from './utils.js';
 import type {
   CreateMappingRequest,
@@ -25,7 +20,7 @@ export function setupRoutes(app: Express): void {
   // GET /api/mimic - Get all mappings
   app.get('/api/mimic', (req: Request, res: Response) => {
     try {
-      const mappings = getAllMappings();
+      const mappings = mimicMappingService.getAllMappings();
       res.status(200).json(
         mappings.map((m) => ({
           id: m.id,
@@ -47,7 +42,7 @@ export function setupRoutes(app: Express): void {
   app.get('/api/mimic/:id', (req: Request<{ id: string }>, res: Response) => {
     try {
       const { id } = req.params;
-      const mapping = getMapping(id);
+      const mapping = mimicMappingService.getMapping(id);
 
       if (!mapping) {
         res.status(404).json({ error: 'Mapping not found' });
@@ -80,7 +75,7 @@ export function setupRoutes(app: Express): void {
           return;
         }
 
-        const mapping = createMapping(url, regexUrl);
+        const mapping = mimicMappingService.createMapping(url, regexUrl);
 
         const response: CreateMappingResponse = { id: mapping.id };
         if (url) {
@@ -105,7 +100,7 @@ export function setupRoutes(app: Express): void {
     (req: Request<{ id: string }, UpdateContentResponse | ErrorResponse>, res: Response) => {
       try {
         const { id } = req.params;
-        const mapping = getMapping(id);
+        const mapping = mimicMappingService.getMapping(id);
 
         if (!mapping) {
           res.status(404).json({ error: 'Mapping not found' });
@@ -115,7 +110,7 @@ export function setupRoutes(app: Express): void {
         // Content is expected as plain text (js, json, html, etc.)
         const content = parseContentFromBody(req.body);
 
-        updateMappingContent(id, content);
+        mimicMappingService.updateMappingContent(id, content);
 
         res.status(200).json({
           success: true,
