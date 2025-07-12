@@ -4,6 +4,7 @@ export interface MimicMapping {
   id: string;
   url?: string;
   regex?: RegExp;
+  regexPattern?: string; // Store the original regex pattern string
   content?: Buffer;
 }
 

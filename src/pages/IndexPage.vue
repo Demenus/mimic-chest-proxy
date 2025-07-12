@@ -1,109 +1,27 @@
 <template>
   <q-page class="main-page">
     <div class="content-container">
-      <q-img src="/mimic-chest.png" alt="Mimic Chest" class="mimic-chest-image" />
-
-      <div class="url-input-section">
-        <q-input
-          v-model="urlInput"
-          :label="inputMode === 'url' ? 'URL' : 'Regex Pattern'"
-          filled
-          class="url-input"
-          @keyup.enter="handleSubmitUrl"
-        >
-          <template v-slot:prepend>
-            <q-btn-toggle
-              v-model="inputMode"
-              toggle-color="primary"
-              :options="[
-                { label: 'URL', value: 'url' },
-                { label: 'Regex', value: 'regex' },
-              ]"
-              class="mode-toggle"
-            />
-          </template>
-          <template v-slot:append>
-            <q-btn
-              round
-              dense
-              flat
-              icon="send"
-              color="primary"
-              @click="handleSubmitUrl"
-              :loading="isSubmitting"
-              :disable="!urlInput.trim()"
-            />
-          </template>
-        </q-input>
-      </div>
+      <!-- URL Input Section -->
+      <UrlInputSection
+        v-model="urlInput"
+        v-model:input-mode="inputMode"
+        :is-submitting="isSubmitting"
+        @submit="handleSubmitUrl"
+      />
 
       <!-- Mappings List -->
-      <div v-if="mappings.length > 0" class="mappings-section">
-        <q-list bordered separator class="mappings-list">
-          <q-item
-            v-for="mapping in mappings"
-            :key="mapping.id"
-            clickable
-            v-ripple
-            @click="selectMapping(mapping.id)"
-            :active="selectedMappingId === mapping.id"
-          >
-            <q-item-section>
-              <q-item-label>{{ mapping.url || mapping.regexUrl || 'No URL' }}</q-item-label>
-              <q-item-label caption>ID: {{ mapping.id }}</q-item-label>
-            </q-item-section>
-            <q-item-section side>
-              <q-chip
-                :color="mapping.hasContent ? 'positive' : 'grey'"
-                text-color="white"
-                size="sm"
-              >
-                {{ mapping.hasContent ? 'Con contenido' : 'Sin contenido' }}
-              </q-chip>
-            </q-item-section>
-          </q-item>
-        </q-list>
-      </div>
+      <MappingsList :mappings="mappings" :selected-id="selectedMappingId" @select="selectMapping" />
 
       <!-- Editor Section -->
-      <div v-if="selectedMappingId" class="editor-section">
-        <q-card>
-          <q-card-section>
-            <div class="row items-center q-gutter-sm">
-              <div class="col">
-                <div class="text-h6">Editor de Contenido</div>
-                <div class="text-caption text-grey">
-                  {{ selectedMapping?.url || selectedMapping?.regexUrl || 'Sin URL' }}
-                </div>
-              </div>
-              <q-select
-                v-model="editorLanguage"
-                :options="languageOptions"
-                label="Lenguaje"
-                dense
-                outlined
-                style="min-width: 150px"
-              />
-              <q-btn
-                color="primary"
-                icon="save"
-                label="Guardar"
-                @click="saveContent"
-                :loading="isSaving"
-                :disable="!selectedMappingId"
-              />
-            </div>
-          </q-card-section>
-          <q-card-section class="editor-container">
-            <CodeEditor
-              v-model="editorContent"
-              :language="editorLanguage"
-              :height="'400px'"
-              @change="handleContentChange"
-            />
-          </q-card-section>
-        </q-card>
-      </div>
+      <ContentEditorSection
+        v-if="selectedMappingId"
+        :url="selectedMapping?.url || selectedMapping?.regexUrl || ''"
+        v-model:content="editorContent"
+        v-model:language="editorLanguage"
+        :is-saving="isSaving"
+        @change="handleContentChange"
+        @save="saveContent"
+      />
     </div>
   </q-page>
 </template>
@@ -112,7 +30,9 @@
 import { ref, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { api, configureMimicApi } from 'boot/axios';
-import CodeEditor from 'components/CodeEditor.vue';
+import UrlInputSection from 'components/UrlInputSection.vue';
+import MappingsList from 'components/MappingsList.vue';
+import ContentEditorSection from 'components/ContentEditorSection.vue';
 
 interface Mapping {
   id: string;
@@ -138,8 +58,6 @@ const editorContent = ref('');
 const editorLanguage = ref('javascript');
 const isSaving = ref(false);
 
-const languageOptions = ['javascript', 'typescript', 'json', 'html', 'css', 'plaintext'];
-
 onMounted(async () => {
   // Check if we're running in Electron
   isElectron.value = typeof window !== 'undefined' && 'electronAPI' in window;
@@ -154,9 +72,16 @@ onMounted(async () => {
 async function loadMappings() {
   try {
     const response = await api.get<Mapping[]>('/api/mimic');
-    mappings.value = response.data;
+    console.log('Loaded mappings:', response.data);
+    mappings.value = response.data || [];
   } catch (error) {
     console.error('Failed to load mappings:', error);
+    $q.notify({
+      type: 'negative',
+      message: `Failed to load mappings: ${error instanceof Error ? error.message : String(error)}`,
+      position: 'top',
+      timeout: 5000,
+    });
   }
 }
 
@@ -211,7 +136,7 @@ async function saveContent() {
 
     $q.notify({
       type: 'positive',
-      message: 'Contenido guardado exitosamente',
+      message: 'Content saved successfully',
       position: 'top',
       timeout: 3000,
     });
@@ -251,7 +176,9 @@ async function handleSubmitUrl() {
         ? { url: urlInput.value.trim() }
         : { regexUrl: urlInput.value.trim() };
 
+    console.log('Submitting URL/regex:', payload);
     const response = await api.post<{ id: string }>('/api/mimic/url', payload);
+    console.log('Response from server:', response.data);
 
     $q.notify({
       type: 'positive',
@@ -264,7 +191,10 @@ async function handleSubmitUrl() {
     urlInput.value = '';
 
     // Reload mappings and select the new one
+    console.log('Reloading mappings...');
     await loadMappings();
+    console.log('Mappings after reload:', mappings.value);
+
     if (response.data.id) {
       await selectMapping(response.data.id);
     }
@@ -286,6 +216,8 @@ async function handleSubmitUrl() {
 <style scoped>
 .main-page {
   padding: 2rem;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #cd853f 0%, #a0522d 100%);
 }
 
 .content-container {
@@ -296,48 +228,5 @@ async function handleSubmitUrl() {
   max-width: 1200px;
   margin: 0 auto;
   gap: 2rem;
-}
-
-.mimic-chest-image {
-  max-width: 120px;
-  width: 120px;
-  height: auto;
-}
-
-.url-input-section {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.url-input {
-  width: 100%;
-}
-
-.mode-toggle {
-  margin-right: 8px;
-}
-
-:deep(.q-field__prepend) {
-  padding-right: 8px;
-}
-
-.mappings-section {
-  width: 100%;
-}
-
-.mappings-list {
-  border-radius: 4px;
-}
-
-.editor-section {
-  width: 100%;
-}
-
-.editor-container {
-  padding: 0;
-  min-height: 400px;
-  position: relative;
 }
 </style>

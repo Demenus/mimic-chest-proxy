@@ -2,7 +2,7 @@
   <q-layout view="lHh Lpr lFf">
     <q-header elevated class="navbar-dark">
       <q-toolbar>
-        <q-toolbar-title> Mimic Chest Proxy </q-toolbar-title>
+        <AppLogo />
         <q-space />
         <q-btn
           v-if="isElectron"
@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
+import AppLogo from 'components/AppLogo.vue';
 
 const $q = useQuasar();
 const isLaunching = ref(false);

@@ -30,7 +30,7 @@ export function setupRoutes(app: Express): void {
         mappings.map((m) => ({
           id: m.id,
           url: m.url,
-          regexUrl: m.regex?.toString(),
+          regexUrl: m.regexPattern || m.regex?.toString(),
           hasContent: !!m.content,
           contentLength: m.content?.length || 0,
         }))
@@ -57,7 +57,7 @@ export function setupRoutes(app: Express): void {
       res.status(200).json({
         id: mapping.id,
         url: mapping.url,
-        regexUrl: mapping.regex?.toString(),
+        regexUrl: mapping.regexPattern || mapping.regex?.toString(),
         content: mapping.content ? mapping.content.toString('utf-8') : '',
       });
     } catch (error) {
