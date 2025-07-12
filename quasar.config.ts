@@ -59,7 +59,12 @@ export default defineConfig((/* ctx */) => {
       // polyfillModulePreload: true,
       // distDir
 
-      // extendViteConf (viteConf) {},
+      extendViteConf (viteConf) {
+        // Configure Monaco Editor workers
+        viteConf.optimizeDeps = viteConf.optimizeDeps || {};
+        viteConf.optimizeDeps.exclude = viteConf.optimizeDeps.exclude || [];
+        viteConf.optimizeDeps.exclude.push('monaco-editor');
+      },
       // viteVuePluginOptions: {},
 
       vitePlugins: [

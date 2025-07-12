@@ -10,10 +10,24 @@ let server: Server | null = null;
 export async function startMimicServer(): Promise<number> {
   const app = express();
 
-  // Middleware to parse JSON and raw body
+  // CORS middleware - allow requests from Electron app
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+      return;
+    }
+
+    next();
+  });
+
+  // Middleware to parse JSON and text body (content is always text: js, json, html, etc.)
   app.use(express.json());
-  app.use(express.raw({ type: 'application/octet-stream', limit: '50mb' }));
-  app.use(express.text({ type: 'text/*', limit: '50mb' }));
+  app.use(express.text({ limit: '50mb' })); // Parse text/plain requests
 
   // Setup API routes
   setupRoutes(app);

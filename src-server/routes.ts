@@ -2,6 +2,7 @@ import type { Express, Request, Response } from 'express';
 import {
   createMapping,
   getMapping,
+  getAllMappings,
   updateMappingContent,
 } from './storage.js';
 import { parseContentFromBody } from './utils.js';
@@ -19,6 +20,52 @@ export function setupRoutes(app: Express): void {
   // Health check endpoint
   app.get('/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok' });
+  });
+
+  // GET /api/mimic - Get all mappings
+  app.get('/api/mimic', (req: Request, res: Response) => {
+    try {
+      const mappings = getAllMappings();
+      res.status(200).json(
+        mappings.map((m) => ({
+          id: m.id,
+          url: m.url,
+          regexUrl: m.regex?.toString(),
+          hasContent: !!m.content,
+          contentLength: m.content?.length || 0,
+        }))
+      );
+    } catch (error) {
+      res.status(500).json({
+        error: 'Failed to get mappings',
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // GET /api/mimic/:id - Get a specific mapping with content
+  app.get('/api/mimic/:id', (req: Request<{ id: string }>, res: Response) => {
+    try {
+      const { id } = req.params;
+      const mapping = getMapping(id);
+
+      if (!mapping) {
+        res.status(404).json({ error: 'Mapping not found' });
+        return;
+      }
+
+      res.status(200).json({
+        id: mapping.id,
+        url: mapping.url,
+        regexUrl: mapping.regex?.toString(),
+        content: mapping.content ? mapping.content.toString('utf-8') : '',
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: 'Failed to get mapping',
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   // POST /api/mimic/url - Register URL or regex
@@ -52,7 +99,7 @@ export function setupRoutes(app: Express): void {
     }
   );
 
-  // POST /api/mimic/:id - Assign content to a mapping
+  // POST /api/mimic/:id - Assign content to a mapping (expects text content)
   app.post(
     '/api/mimic/:id',
     (req: Request<{ id: string }, UpdateContentResponse | ErrorResponse>, res: Response) => {
@@ -65,7 +112,7 @@ export function setupRoutes(app: Express): void {
           return;
         }
 
-        // Parse content from body
+        // Content is expected as plain text (js, json, html, etc.)
         const content = parseContentFromBody(req.body);
 
         updateMappingContent(id, content);

@@ -42,11 +42,7 @@ async function createWindow() {
     await mainWindow.loadFile('index.html');
   }
 
-  // DevTools disabled - no automatic opening
-  // Production protection: close DevTools if opened
-  mainWindow.webContents.on('devtools-opened', () => {
-    mainWindow?.webContents.closeDevTools();
-  });
+  // DevTools: not opened automatically, but can be opened manually (Ctrl+Shift+I / Cmd+Option+I)
 
   mainWindow.on('closed', () => {
     mainWindow = undefined;
