@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare namespace NodeJS {
   interface ProcessEnv {
     NODE_ENV: string;
@@ -5,3 +6,14 @@ declare namespace NodeJS {
     VUE_ROUTER_BASE: string | undefined;
   }
 }
+
+declare global {
+  interface Window {
+    electronAPI?: {
+      launchMimicChrome: () => Promise<{ success: boolean; error?: string }>;
+      getMimicServerPort: () => Promise<number | null>;
+    };
+  }
+}
+
+export { };

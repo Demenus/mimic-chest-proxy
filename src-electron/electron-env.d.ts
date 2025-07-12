@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare namespace NodeJS {
   interface ProcessEnv {
     QUASAR_PUBLIC_FOLDER: string;
@@ -6,3 +7,14 @@ declare namespace NodeJS {
     APP_URL: string;
   }
 }
+
+declare global {
+  interface Window {
+    electronAPI: {
+      launchMimicChrome: () => Promise<{ success: boolean; error?: string }>;
+      getMimicServerPort: () => Promise<number | null>;
+    };
+  }
+}
+
+export {};

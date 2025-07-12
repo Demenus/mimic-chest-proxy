@@ -10,7 +10,7 @@ export function createProxyHandler(targetUrl: string) {
     const baseUrl = `${targetUrlObj.protocol}//${targetUrlObj.host}`;
 
     return proxy(baseUrl, {
-      proxyReqPathResolver: (req: Request) => {
+      proxyReqPathResolver: () => {
         // Use the path from the original target URL
         return targetUrlObj.pathname + targetUrlObj.search;
       },
