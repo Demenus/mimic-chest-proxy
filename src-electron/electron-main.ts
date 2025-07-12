@@ -1,7 +1,8 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import os from 'os';
-import { fileURLToPath } from 'url'
+import { fileURLToPath } from 'url';
+import { startMimicServer } from '../src-server/index.js';
 
 // needed in case process is undefined under Linux
 const platform = process.platform || os.platform();
@@ -50,7 +51,10 @@ async function createWindow() {
   });
 }
 
-void app.whenReady().then(createWindow);
+void app.whenReady().then(async () => {
+  await createWindow();
+  await startMimicServer();
+});
 
 app.on('window-all-closed', () => {
   if (platform !== 'darwin') {
