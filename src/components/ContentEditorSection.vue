@@ -17,8 +17,8 @@
 
 <template>
   <div class="editor-section">
-    <q-card flat bordered>
-      <q-card-section>
+    <q-card flat bordered class="editor-card">
+      <q-card-section class="editor-header">
         <div class="row items-center q-gutter-sm">
           <div class="col">
             <div class="text-h6">Content Editor</div>
@@ -49,7 +49,6 @@
         <CodeEditor
           :model-value="content"
           :language="language"
-          :height="'400px'"
           @update:model-value="(val) => $emit('update:content', val)"
           @change="(val) => $emit('change', val)"
         />
@@ -93,11 +92,27 @@ defineEmits<{
 <style scoped>
 .editor-section {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-header {
+  flex-shrink: 0;
 }
 
 .editor-container {
   padding: 0;
-  min-height: 400px;
+  flex: 1;
+  min-height: 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 </style>

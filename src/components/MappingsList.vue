@@ -17,8 +17,7 @@
 
 <template>
   <div class="mappings-section">
-    <div class="section-description">Click on a mapping to edit its content.</div>
-    <q-list v-if="mappings.length > 0" bordered separator class="mappings-list">
+    <q-list bordered separator class="mappings-list">
       <q-item
         v-for="mapping in mappings"
         :key="mapping.id"
@@ -51,11 +50,6 @@
         </q-item-section>
       </q-item>
     </q-list>
-    <div v-else class="empty-state">
-      <div class="text-body2 text-grey-6">
-        No mappings registered yet. Add a URL or regex pattern above to get started.
-      </div>
-    </div>
   </div>
 </template>
 
@@ -84,6 +78,7 @@ defineEmits<{
 <style scoped>
 .mappings-section {
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -103,10 +98,7 @@ defineEmits<{
 
 .mappings-list {
   border-radius: 4px;
-}
-
-.empty-state {
-  padding: 1.5rem;
-  text-align: center;
+  flex: 1;
+  overflow-y: auto;
 }
 </style>

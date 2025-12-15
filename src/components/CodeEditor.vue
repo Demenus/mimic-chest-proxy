@@ -16,7 +16,7 @@
   -->
 
 <template>
-  <div class="code-editor-container" :style="{ height: height }">
+  <div class="code-editor-container" :style="containerStyle">
     <MonacoEditor
       :value="modelValue"
       :language="language"
@@ -29,6 +29,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import MonacoEditor from 'monaco-editor-vue3';
 
 export interface Props {
@@ -38,16 +39,22 @@ export interface Props {
   height?: string;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   language: 'javascript',
   theme: 'vs-dark',
-  height: '500px',
 });
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
   change: [value: string];
 }>();
+
+const containerStyle = computed(() => {
+  if (props.height) {
+    return { height: props.height };
+  }
+  return { height: '100%' };
+});
 
 const editorOptions = {
   minimap: { enabled: false },
@@ -81,6 +88,6 @@ function handleUpdate(value: string) {
 .monaco-editor {
   width: 100%;
   flex: 1;
-  min-height: 400px;
+  min-height: 0;
 }
 </style>

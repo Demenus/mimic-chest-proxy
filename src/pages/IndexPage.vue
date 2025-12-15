@@ -1,20 +1,3 @@
-<!--
-  - Copyright (c) 2025 Aarón Negrín
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
-
 <template>
   <q-page class="main-page">
     <div class="content-container">
@@ -26,21 +9,16 @@
         @submit="handleSubmitUrl"
       />
 
-      <!-- Mappings List -->
-      <MappingsList
+      <!-- Mappings List and Editor Layout -->
+      <MappingsEditorLayout
         :mappings="mimicStore.mappings"
         :selected-id="mimicStore.selectedMappingId"
-        @select="handleSelectMapping"
-        @delete="handleDeleteMapping"
-      />
-
-      <!-- Editor Section -->
-      <ContentEditorSection
-        v-if="mimicStore.selectedMappingId"
-        :url="mimicStore.selectedMappingUrl"
+        :selected-url="mimicStore.selectedMappingUrl"
         v-model:content="editorContent"
         v-model:language="editorLanguage"
         :is-saving="mimicStore.isSaving"
+        @select="handleSelectMapping"
+        @delete="handleDeleteMapping"
         @change="handleContentChange"
         @save="handleSaveContent"
       />
@@ -53,8 +31,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { useMimicStore } from 'stores/mimic-store';
 import UrlInputSection from 'components/UrlInputSection.vue';
-import MappingsList from 'components/MappingsList.vue';
-import ContentEditorSection from 'components/ContentEditorSection.vue';
+import MappingsEditorLayout from 'components/MappingsEditorLayout.vue';
 
 const $q = useQuasar();
 const mimicStore = useMimicStore();
@@ -196,17 +173,21 @@ function handleDeleteMapping(id: string) {
 <style scoped>
 .main-page {
   padding: 2rem;
-  min-height: 100vh;
+  height: 100vh;
   background: linear-gradient(135deg, #cd853f 0%, #a0522d 100%);
+  display: flex;
+  flex-direction: column;
 }
 
 .content-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
   width: 100%;
-  max-width: 1200px;
+  max-width: 95%;
+  max-height: 95%;
   margin: 0 auto;
   gap: 2rem;
+  flex: 1;
+  min-height: 0;
 }
 </style>
