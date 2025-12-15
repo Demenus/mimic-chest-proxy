@@ -4,6 +4,10 @@ import { fileURLToPath } from 'url';
 import type { Server } from 'net';
 import { logger } from '../logger.js';
 import { RequestHandler } from './RequestHandler.js';
+import { silencePackageLogs } from '../utils/console-silencer.js';
+
+// Silence console logs from http-mitm-proxy before importing it
+silencePackageLogs('http-mitm-proxy');
 
 const require = createRequire(import.meta.url);
 const Proxy = require('http-mitm-proxy').Proxy;
