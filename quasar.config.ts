@@ -59,7 +59,7 @@ export default defineConfig((/* ctx */) => {
       // polyfillModulePreload: true,
       // distDir
 
-      extendViteConf (viteConf) {
+      extendViteConf(viteConf) {
         // Configure Monaco Editor workers
         viteConf.optimizeDeps = viteConf.optimizeDeps || {};
         viteConf.optimizeDeps.exclude = viteConf.optimizeDeps.exclude || [];
@@ -105,7 +105,7 @@ export default defineConfig((/* ctx */) => {
       // directives: [],
 
       // Quasar plugins
-      plugins: ['Notify'],
+      plugins: ['Notify', 'Dialog'],
     },
 
     // animations: 'all', // --- includes all animations
