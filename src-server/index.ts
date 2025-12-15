@@ -2,6 +2,7 @@
 import { startMimicServer } from './mimic/index.js';
 import { startProxyServer } from './proxy/index.js';
 import { logger } from './logger.js';
+import { mimicMappingService } from './MimicMappingService.js';
 
 // Export both servers for convenience
 export { startMimicServer } from './mimic/index.js';
@@ -24,9 +25,16 @@ export interface ServerPorts {
 /**
  * Initialize both servers (mimic and proxy) and return their ports
  * This is the main entry point for starting the servers
+ * @param userDataPath - Optional path to user data directory for persistence
  */
-export async function startServers(): Promise<ServerPorts> {
-  logger.info('Starting both servers...');
+export async function startServers(userDataPath?: string): Promise<ServerPorts> {
+  logger.info('Starting both servers...', { userDataPath });
+
+  // Initialize storage if userDataPath is provided
+  if (userDataPath) {
+    await mimicMappingService.init(userDataPath);
+    logger.info('MimicMappingService initialized with persistence', { userDataPath });
+  }
 
   // Start both servers in parallel
   const [mimicPort, proxyPort] = await Promise.all([

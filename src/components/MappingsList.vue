@@ -15,9 +15,22 @@
           <q-item-label caption>ID: {{ mapping.id }}</q-item-label>
         </q-item-section>
         <q-item-section side>
-          <q-chip :color="mapping.hasContent ? 'positive' : 'grey'" text-color="white" size="sm">
-            {{ mapping.hasContent ? 'With content' : 'No content' }}
-          </q-chip>
+          <div class="row items-center q-gutter-sm">
+            <q-chip :color="mapping.hasContent ? 'positive' : 'grey'" text-color="white" size="sm">
+              {{ mapping.hasContent ? 'With content' : 'No content' }}
+            </q-chip>
+            <q-btn
+              flat
+              round
+              dense
+              icon="delete"
+              color="negative"
+              size="sm"
+              @click.stop="$emit('delete', mapping.id)"
+            >
+              <q-tooltip>Delete mapping</q-tooltip>
+            </q-btn>
+          </div>
         </q-item-section>
       </q-item>
     </q-list>
@@ -47,6 +60,7 @@ defineProps<Props>();
 
 defineEmits<{
   select: [id: string];
+  delete: [id: string];
 }>();
 </script>
 

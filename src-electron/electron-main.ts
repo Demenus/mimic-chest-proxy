@@ -72,7 +72,8 @@ ipcMain.handle('get-proxy-server-port', () => {
 
 void app.whenReady().then(async () => {
   await createWindow();
-  serverPorts = await startServers();
+  const userDataPath = app.getPath('userData');
+  serverPorts = await startServers(userDataPath);
   console.log(`Mimic server started on port ${serverPorts.mimicPort}`);
   console.log(`Proxy server started on port ${serverPorts.proxyPort}`);
 });

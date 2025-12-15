@@ -10,7 +10,12 @@
       />
 
       <!-- Mappings List -->
-      <MappingsList :mappings="mappings" :selected-id="selectedMappingId" @select="selectMapping" />
+      <MappingsList
+        :mappings="mappings"
+        :selected-id="selectedMappingId"
+        @select="selectMapping"
+        @delete="deleteMapping"
+      />
 
       <!-- Editor Section -->
       <ContentEditorSection
@@ -210,6 +215,55 @@ async function handleSubmitUrl() {
   } finally {
     isSubmitting.value = false;
   }
+}
+
+function deleteMapping(id: string) {
+  if (!isElectron.value) {
+    $q.notify({
+      type: 'negative',
+      message: 'This feature is only available in Electron',
+      position: 'top',
+    });
+    return;
+  }
+
+  // Confirm deletion
+  $q.dialog({
+    title: 'Confirm deletion',
+    message: 'Are you sure you want to delete this mapping? This action cannot be undone.',
+    cancel: true,
+    persistent: true,
+  }).onOk(() => {
+    void (async () => {
+      try {
+        await api.delete(`/api/mimic/${id}`);
+
+        $q.notify({
+          type: 'positive',
+          message: 'Mapping deleted successfully',
+          position: 'top',
+          timeout: 3000,
+        });
+
+        // If the deleted mapping was selected, clear the selection
+        if (selectedMappingId.value === id) {
+          selectedMappingId.value = null;
+          selectedMapping.value = null;
+          editorContent.value = '';
+        }
+
+        // Reload mappings
+        await loadMappings();
+      } catch (error) {
+        $q.notify({
+          type: 'negative',
+          message: `Failed to delete mapping: ${error instanceof Error ? error.message : String(error)}`,
+          position: 'top',
+          timeout: 5000,
+        });
+      }
+    })();
+  });
 }
 </script>
 

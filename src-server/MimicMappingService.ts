@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { MimicMapping } from './types.js';
+import { MimicMappingStorage } from './storage/MimicMappingStorage.js';
 
 /**
  * Service for managing mimic mappings
@@ -8,12 +9,43 @@ import type { MimicMapping } from './types.js';
 export class MimicMappingService {
   // In-memory storage for mimic mappings
   private readonly mimicMappings = new Map<string, MimicMapping>();
+  private storage: MimicMappingStorage | null = null;
+  private initialized = false;
+
+  /**
+   * Initialize the service with storage path
+   * Must be called before using the service
+   */
+  async init(userDataPath: string): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    const storagePath = userDataPath ? `${userDataPath}/mimic` : undefined;
+    if (!storagePath) {
+      // If no path provided, continue with in-memory only
+      this.initialized = true;
+      return;
+    }
+
+    this.storage = new MimicMappingStorage(storagePath);
+    await this.storage.initialize();
+
+    // Load existing mappings from storage
+    const metadataList = await this.storage.loadIndex();
+    for (const metadata of metadataList) {
+      const mapping = this.storage.metadataToMapping(metadata);
+      this.mimicMappings.set(metadata.id, mapping as MimicMapping);
+    }
+
+    this.initialized = true;
+  }
 
   /**
    * Create a new mapping for a URL or regex pattern
    * If a mapping with the same URL or regexUrl already exists, it will be overwritten
    */
-  createMapping(url?: string, regexUrl?: string): MimicMapping {
+  async createMapping(url?: string, regexUrl?: string): Promise<MimicMapping> {
     // Check if a mapping with the same URL or regexUrl already exists
     let existingMapping: MimicMapping | undefined;
     let existingId: string | undefined;
@@ -64,6 +96,7 @@ export class MimicMappingService {
         }
       }
       this.mimicMappings.set(existingId, existingMapping);
+      await this.persistMapping(existingMapping);
       return existingMapping;
     }
 
@@ -85,13 +118,65 @@ export class MimicMappingService {
     }
 
     this.mimicMappings.set(id, mapping);
+    await this.persistMapping(mapping);
     return mapping;
   }
 
   /**
-   * Get a mapping by ID
+   * Persist a mapping to storage
    */
-  getMapping(id: string): MimicMapping | undefined {
+  private async persistMapping(mapping: MimicMapping): Promise<void> {
+    if (!this.storage) {
+      return;
+    }
+
+    try {
+      const metadataList = Array.from(this.mimicMappings.values()).map((m) =>
+        this.storage!.mappingToMetadata(m)
+      );
+      await this.storage.saveIndex(metadataList);
+
+      // Save content if it exists
+      if (mapping.content) {
+        await this.storage.saveContent(mapping.id, mapping.content);
+      }
+    } catch (error) {
+      console.error('Failed to persist mapping:', error);
+      // Don't throw - continue operation even if persistence fails
+    }
+  }
+
+  /**
+   * Get a mapping by ID
+   * Loads content from storage if not already in memory
+   */
+  async getMapping(id: string): Promise<MimicMapping | undefined> {
+    const mapping = this.mimicMappings.get(id);
+    if (!mapping) {
+      return undefined;
+    }
+
+    // Load content from storage if not in memory and storage is available
+    if (!mapping.content && this.storage) {
+      try {
+        const content = await this.storage.loadContent(id);
+        if (content) {
+          mapping.content = content;
+          this.mimicMappings.set(id, mapping);
+        }
+      } catch (error) {
+        console.error(`Failed to load content for mapping ${id}:`, error);
+      }
+    }
+
+    return mapping;
+  }
+
+  /**
+   * Get a mapping by ID (synchronous version for backward compatibility)
+   * Note: Content may not be loaded if not already in memory
+   */
+  getMappingSync(id: string): MimicMapping | undefined {
     return this.mimicMappings.get(id);
   }
 
@@ -119,9 +204,34 @@ export class MimicMappingService {
   }
 
   /**
+   * Find a matching mapping by URL (async version that loads content)
+   */
+  async findMatchingMappingAsync(url: string): Promise<MimicMapping | undefined> {
+    const mapping = this.findMatchingMapping(url);
+    if (!mapping) {
+      return undefined;
+    }
+
+    // Load content if not already in memory
+    if (!mapping.content && this.storage) {
+      try {
+        const content = await this.storage.loadContent(mapping.id);
+        if (content) {
+          mapping.content = content;
+          this.mimicMappings.set(mapping.id, mapping);
+        }
+      } catch (error) {
+        console.error(`Failed to load content for mapping ${mapping.id}:`, error);
+      }
+    }
+
+    return mapping;
+  }
+
+  /**
    * Update the content of a mapping
    */
-  updateMappingContent(id: string, content: Buffer): MimicMapping {
+  async updateMappingContent(id: string, content: Buffer): Promise<MimicMapping> {
     const mapping = this.mimicMappings.get(id);
     if (!mapping) {
       throw new Error('Mapping not found');
@@ -129,6 +239,7 @@ export class MimicMappingService {
 
     mapping.content = content;
     this.mimicMappings.set(id, mapping);
+    await this.persistMapping(mapping);
     return mapping;
   }
 
@@ -140,10 +251,100 @@ export class MimicMappingService {
   }
 
   /**
+   * Get all mappings with metadata (hasContent derived from contentLength > 0)
+   * This method loads metadata from storage to get accurate contentLength
+   * without loading the actual content files. hasContent is derived from contentLength > 0
+   */
+  async getAllMappingsWithMetadata(): Promise<
+    Array<{
+      id: string;
+      url?: string;
+      regexUrl?: string;
+      hasContent: boolean;
+      contentLength: number;
+    }>
+  > {
+    const mappings = Array.from(this.mimicMappings.values());
+
+    // If we have storage, get accurate metadata
+    if (this.storage) {
+      const metadataList = await this.storage.loadIndex();
+      const metadataMap = new Map(metadataList.map((m) => [m.id, m]));
+
+      return mappings.map((m) => {
+        const metadata = metadataMap.get(m.id);
+        const regexUrl = m.regexPattern || m.regex?.toString();
+        const contentLength = metadata?.contentLength ?? m.content?.length ?? 0;
+        const result: {
+          id: string;
+          url?: string;
+          regexUrl?: string;
+          hasContent: boolean;
+          contentLength: number;
+        } = {
+          id: m.id,
+          hasContent: contentLength > 0,
+          contentLength,
+        };
+        if (m.url) {
+          result.url = m.url;
+        }
+        if (regexUrl) {
+          result.regexUrl = regexUrl;
+        }
+        return result;
+      });
+    }
+
+    // Fallback to in-memory data if no storage
+    return mappings.map((m) => {
+      const regexUrl = m.regexPattern || m.regex?.toString();
+      const contentLength = m.content?.length || 0;
+      const result: {
+        id: string;
+        url?: string;
+        regexUrl?: string;
+        hasContent: boolean;
+        contentLength: number;
+      } = {
+        id: m.id,
+        hasContent: contentLength > 0,
+        contentLength,
+      };
+      if (m.url) {
+        result.url = m.url;
+      }
+      if (regexUrl) {
+        result.regexUrl = regexUrl;
+      }
+      return result;
+    });
+  }
+
+  /**
    * Delete a mapping by ID
    */
-  deleteMapping(id: string): boolean {
-    return this.mimicMappings.delete(id);
+  async deleteMapping(id: string): Promise<boolean> {
+    const deleted = this.mimicMappings.delete(id);
+    if (!deleted) {
+      return false;
+    }
+
+    // Persist changes and delete content file
+    if (this.storage) {
+      try {
+        const metadataList = Array.from(this.mimicMappings.values()).map((m) =>
+          this.storage!.mappingToMetadata(m)
+        );
+        await this.storage.saveIndex(metadataList);
+        await this.storage.deleteContent(id);
+      } catch (error) {
+        console.error(`Failed to persist deletion of mapping ${id}:`, error);
+        // Don't throw - mapping is already deleted from memory
+      }
+    }
+
+    return true;
   }
 }
 
