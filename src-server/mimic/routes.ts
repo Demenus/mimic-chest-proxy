@@ -66,8 +66,8 @@ export function setupRoutes(app: Express): void {
 
         res.status(200).json({
           id: mapping.id,
-          url: mapping.url,
-          regexUrl: mapping.regexPattern || mapping.regex?.toString(),
+          pattern: mapping.pattern,
+          regexPattern: mapping.regexPattern,
           content: mapping.content ? mapping.content.toString('utf-8') : '',
         });
       } catch (error) {
@@ -79,26 +79,26 @@ export function setupRoutes(app: Express): void {
     }
   );
 
-  // POST /api/mimic/url - Register URL or regex
+  // POST /api/mimic/url - Register glob pattern or regex pattern
   app.post(
     '/api/mimic/url',
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     async (req: Request<unknown, CreateMappingResponse | ErrorResponse, CreateMappingRequest>, res: Response) => {
       try {
-        const { url, regexUrl } = req.body;
+        const { pattern, regexPattern } = req.body;
 
-        if (!url && !regexUrl) {
-          res.status(400).json({ error: 'Either url or regexUrl must be provided' });
+        if (!pattern && !regexPattern) {
+          res.status(400).json({ error: 'Either pattern or regexPattern must be provided' });
           return;
         }
 
-        const mapping = await mimicMappingService.createMapping(url, regexUrl);
+        const mapping = await mimicMappingService.createMapping(pattern, regexPattern);
 
         const response: CreateMappingResponse = { id: mapping.id };
-        if (url) {
-          response.url = url;
-        } else if (regexUrl) {
-          response.regexUrl = regexUrl;
+        if (pattern) {
+          response.pattern = pattern;
+        } else if (regexPattern) {
+          response.regexPattern = regexPattern;
         }
 
         res.status(201).json(response);

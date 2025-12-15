@@ -18,11 +18,11 @@
 <template>
   <div class="url-input-section">
     <div class="section-description">
-      Register a URL or regex pattern to intercept and modify its content
+      Register a glob pattern or regex pattern to intercept and modify its content
     </div>
     <q-input
       :model-value="modelValue"
-      :label="inputMode === 'url' ? 'URL' : 'Regex Pattern'"
+      :label="inputMode === 'url' ? 'Glob Pattern' : 'Regex Pattern'"
       filled
       class="url-input"
       @update:model-value="handleValueUpdate"
@@ -33,7 +33,7 @@
           :model-value="inputMode"
           toggle-color="primary"
           :options="[
-            { label: 'URL', value: 'url' },
+            { label: 'Glob', value: 'url' },
             { label: 'Regex', value: 'regex' },
           ]"
           class="mode-toggle"

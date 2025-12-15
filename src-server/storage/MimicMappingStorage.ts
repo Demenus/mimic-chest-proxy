@@ -136,7 +136,7 @@ export class MimicMappingStorage {
   mappingToInterface(mapping: MimicMapping): IMimicMapping {
     return {
       id: mapping.id,
-      url: mapping.url,
+      pattern: mapping.pattern,
       regexPattern: mapping.regexPattern,
       contentLength: mapping.contentLength,
     };
@@ -164,11 +164,11 @@ export class MimicMappingStorage {
   }
 
   /**
-   * Find a mapping by exact URL match
+   * Find a mapping by exact pattern match
    */
-  findByUrl(url: string): { id: string; mapping: MimicMapping } | undefined {
+  findByPattern(pattern: string): { id: string; mapping: MimicMapping } | undefined {
     for (const [id, mapping] of this.mimicMappings.entries()) {
-      if (mapping.url === url) {
+      if (mapping.pattern === pattern) {
         return { id, mapping };
       }
     }
@@ -189,20 +189,20 @@ export class MimicMappingStorage {
 
   /**
    * Find a matching mapping by URL
-   * First checks for exact URL matches, then checks regex patterns
-   * This ensures that fixed URLs take priority over generic regex patterns
+   * First checks for glob patterns, then checks regex patterns
+   * This ensures that glob patterns are checked before regex patterns
    */
   findMatchingMapping(url: string): MimicMapping | undefined {
-    // First pass: check all exact URL matches
+    // First pass: check all glob patterns
     for (const mapping of this.mimicMappings.values()) {
-      if (mapping.url !== null && mapping.url === url) {
+      if (mapping.pattern !== null && mapping.matches(url)) {
         return mapping;
       }
     }
 
-    // Second pass: check regex patterns (only if no exact URL match was found)
+    // Second pass: check regex patterns (only if no glob pattern match was found)
     for (const mapping of this.mimicMappings.values()) {
-      if (mapping.matches(url)) {
+      if (mapping.pattern === null && mapping.regexPattern !== null && mapping.matches(url)) {
         return mapping;
       }
     }

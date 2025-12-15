@@ -49,36 +49,36 @@ export class MimicMappingService {
   }
 
   /**
-   * Create a new mapping for a URL or regex pattern
-   * If a mapping with the same URL or regexUrl already exists, it will be overwritten
+   * Create a new mapping for a glob pattern or regex pattern
+   * If a mapping with the same pattern or regexPattern already exists, it will be overwritten
    */
-  async createMapping(url?: string, regexUrl?: string): Promise<MimicMapping> {
+  async createMapping(pattern?: string, regexPattern?: string): Promise<MimicMapping> {
     if (!this.storage) {
       throw new Error('Storage not initialized');
     }
 
-    // Check if a mapping with the same URL or regexUrl already exists
+    // Check if a mapping with the same pattern or regexPattern already exists
     let existing: { id: string; mapping: MimicMapping } | undefined;
 
-    if (url) {
-      existing = this.storage.findByUrl(url);
-    } else if (regexUrl) {
-      existing = this.storage.findByRegex(regexUrl);
+    if (pattern) {
+      existing = this.storage.findByPattern(pattern);
+    } else if (regexPattern) {
+      existing = this.storage.findByRegex(regexPattern);
     } else {
-      throw new Error('Either url or regexUrl must be provided');
+      throw new Error('Either pattern or regexPattern must be provided');
     }
 
     // If existing mapping found, update it; otherwise create new one
     if (existing) {
       // Overwrite existing mapping, preserving content if it exists
-      if (url) {
-        existing.mapping.url = url;
+      if (pattern) {
+        existing.mapping.setPattern(pattern);
         // Clear regex if it was a regex mapping before
         existing.mapping.clearRegex();
-      } else if (regexUrl) {
-        existing.mapping.setRegexPattern(regexUrl);
-        // Clear url if it was a URL mapping before
-        existing.mapping.url = null;
+      } else if (regexPattern) {
+        existing.mapping.setRegexPattern(regexPattern);
+        // Clear pattern if it was a glob pattern mapping before
+        existing.mapping.clearPattern();
       }
       await this.storage.set(existing.id, existing.mapping);
       return existing.mapping;
@@ -86,7 +86,7 @@ export class MimicMappingService {
 
     // Create new mapping
     const id = randomUUID();
-    const mapping = new MimicMapping(id, url ?? null, regexUrl ?? null);
+    const mapping = new MimicMapping(id, pattern ?? null, regexPattern ?? null);
 
     await this.storage.set(id, mapping);
     return mapping;
@@ -136,8 +136,8 @@ export class MimicMappingService {
 
   /**
    * Find a matching mapping by URL
-   * First checks for exact URL matches, then checks regex patterns
-   * This ensures that fixed URLs take priority over generic regex patterns
+   * First checks for glob patterns, then checks regex patterns
+   * This ensures that glob patterns are checked before regex patterns
    */
   findMatchingMapping(url: string): MimicMapping | undefined {
     if (!this.storage) {
@@ -210,8 +210,8 @@ export class MimicMappingService {
    */
   getAllMappingsWithMetadata(): Array<{
     id: string;
-    url?: string;
-    regexUrl?: string;
+    pattern?: string;
+    regexPattern?: string;
     hasContent: boolean;
     contentLength: number;
   }> {

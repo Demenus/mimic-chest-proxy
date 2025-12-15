@@ -18,14 +18,14 @@
 // Types and interfaces for the mimic proxy server
 
 export interface CreateMappingRequest {
-  url?: string;
-  regexUrl?: string;
+  pattern?: string;
+  regexPattern?: string;
 }
 
 export interface CreateMappingResponse {
   id: string;
-  url?: string;
-  regexUrl?: string;
+  pattern?: string;
+  regexPattern?: string;
 }
 
 export interface UpdateContentResponse {

@@ -105,14 +105,14 @@ async function handleSubmitUrl() {
   try {
     const payload =
       inputMode.value === 'url'
-        ? { url: urlInput.value.trim() }
-        : { regexUrl: urlInput.value.trim() };
+        ? { pattern: urlInput.value.trim() }
+        : { regexPattern: urlInput.value.trim() };
 
     await mimicStore.createMapping(payload);
 
     $q.notify({
       type: 'positive',
-      message: `Successfully registered ${inputMode.value === 'url' ? 'URL' : 'regex pattern'}!`,
+      message: `Successfully registered ${inputMode.value === 'url' ? 'glob pattern' : 'regex pattern'}!`,
       position: 'top',
       timeout: 3000,
     });
@@ -122,7 +122,7 @@ async function handleSubmitUrl() {
   } catch (error) {
     $q.notify({
       type: 'negative',
-      message: `Failed to register ${inputMode.value === 'url' ? 'URL' : 'regex'}: ${
+      message: `Failed to register ${inputMode.value === 'url' ? 'glob pattern' : 'regex pattern'}: ${
         error instanceof Error ? error.message : String(error)
       }`,
       position: 'top',

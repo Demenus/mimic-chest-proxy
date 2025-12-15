@@ -134,31 +134,11 @@ export class RequestHandler {
 
   /**
    * Handle normal proxy request (no content substitution)
-   * May redirect to different URL if mapping exists, otherwise proxies normally
+   * Patterns are used for matching only, not for URL redirection
    */
-  private handleNormalProxy(ctx: MitmProxyContext, mapping: { url: string | null } | undefined, targetUrl: string, callback: () => void): void {
-    // If mapping found with URL redirect, update proxy target
-    if (mapping?.url && mapping.url !== null && mapping.url !== targetUrl) {
-      const mappedUrlObj = new URL(mapping.url);
-      const originalUrlObj = new URL(targetUrl);
-
-      ctx.proxyToServerRequestOptions.host = mappedUrlObj.hostname;
-      const port = mappedUrlObj.port
-        ? parseInt(mappedUrlObj.port, 10)
-        : mappedUrlObj.protocol === 'https:'
-          ? 443
-          : 80;
-      ctx.proxyToServerRequestOptions.port = port;
-      ctx.proxyToServerRequestOptions.protocol = mappedUrlObj.protocol;
-      ctx.proxyToServerRequestOptions.path = originalUrlObj.pathname + originalUrlObj.search;
-
-      logger.debug('Redirecting proxy request', {
-        originalUrl: targetUrl,
-        mappedUrl: mapping.url,
-      });
-    }
-
+  private handleNormalProxy(ctx: MitmProxyContext, callback: () => void): void {
     // Normal proxy behavior - no event handlers needed, let proxy work normally
+    // Patterns are only used for content substitution, not URL redirection
     return callback();
   }
 
@@ -175,10 +155,11 @@ export class RequestHandler {
       return callback();
     }
 
-    // Find matching mapping
-    const mapping = mimicMappingService.findMatchingMapping(targetUrl);
+    // Find matching mapping (for potential content substitution in handleResponse)
+    // Patterns are only used for matching, not URL redirection
+    void mimicMappingService.findMatchingMapping(targetUrl);
 
-    // Only handle URL redirections here, content substitution is done in onResponse
-    return this.handleNormalProxy(ctx, mapping, targetUrl, callback);
+    // Normal proxy behavior
+    return this.handleNormalProxy(ctx, callback);
   }
 }

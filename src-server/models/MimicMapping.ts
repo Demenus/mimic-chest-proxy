@@ -21,25 +21,30 @@
  */
 export interface IMimicMapping {
   id: string;
-  url: string | null;
+  pattern: string | null;
   regexPattern: string | null;
   contentLength: number;
 }
 
+import picomatch from 'picomatch';
+
 /**
- * MimicMapping class that encapsulates URL and regex pattern mapping logic
- * Handles both exact URL matching and regex pattern matching for content mimicry
+ * MimicMapping class that encapsulates glob pattern and regex pattern mapping logic
+ * Handles both glob pattern matching (using picomatch) and regex pattern matching for content mimicry
  */
 export class MimicMapping implements IMimicMapping {
   public readonly id: string;
-  public url: string | null = null;
+  private _pattern: string | null = null;
+  private _picomatchMatcher: ((str: string) => boolean) | undefined;
   private _regex: RegExp | undefined;
   private _regexPattern: string | null = null;
   public content: Buffer | undefined;
 
-  constructor(id: string, url?: string | null, regexPattern?: string | null, content?: Buffer) {
+  constructor(id: string, pattern?: string | null, regexPattern?: string | null, content?: Buffer) {
     this.id = id;
-    this.url = url ?? null;
+    if (pattern) {
+      this.setPattern(pattern);
+    }
     if (regexPattern) {
       this.setRegexPattern(regexPattern);
     }
@@ -48,6 +53,13 @@ export class MimicMapping implements IMimicMapping {
 
   get hasContent(): boolean {
     return this.content !== undefined;
+  }
+
+  /**
+   * Get the glob pattern string
+   */
+  get pattern(): string | null {
+    return this._pattern;
   }
 
   /**
@@ -69,6 +81,27 @@ export class MimicMapping implements IMimicMapping {
    */
   get regex(): RegExp | undefined {
     return this._regex;
+  }
+
+  /**
+   * Set the glob pattern and create the picomatch matcher
+   * Throws error if pattern is invalid
+   */
+  setPattern(pattern: string): void {
+    this._pattern = pattern;
+    try {
+      this._picomatchMatcher = picomatch(pattern);
+    } catch (error) {
+      throw new Error(`Invalid glob pattern: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Clear glob pattern and picomatch matcher
+   */
+  clearPattern(): void {
+    this._pattern = null;
+    this._picomatchMatcher = undefined;
   }
 
   /**
@@ -94,15 +127,23 @@ export class MimicMapping implements IMimicMapping {
 
   /**
    * Check if this mapping matches a given URL
-   * First checks exact URL match, then regex pattern
+   * First checks glob pattern (using picomatch), then regex pattern
    */
   matches(url: string): boolean {
-    if (this.url && this.url === url) {
-      return true;
+    // First try glob pattern matching
+    if (this._pattern !== null && this._picomatchMatcher) {
+      if (this._picomatchMatcher(url)) {
+        return true;
+      }
     }
-    if (this._regexPattern && this._regex && this._regex.test(url)) {
-      return true;
+
+    // Then try regex pattern matching
+    if (this._regexPattern !== null && this._regex) {
+      if (this._regex.test(url)) {
+        return true;
+      }
     }
+
     return false;
   }
 
@@ -112,7 +153,15 @@ export class MimicMapping implements IMimicMapping {
    */
   static fromInterface(data: IMimicMapping): MimicMapping {
     const mapping = new MimicMapping(data.id);
-    mapping.url = data.url;
+
+    if (data.pattern) {
+      try {
+        mapping.setPattern(data.pattern);
+      } catch {
+        // Skip invalid glob patterns
+        console.warn(`Invalid glob pattern for mapping ${data.id}: ${data.pattern}`);
+      }
+    }
 
     if (data.regexPattern) {
       try {
@@ -128,19 +177,19 @@ export class MimicMapping implements IMimicMapping {
 
   /**
    * Create a metadata response object (for API responses)
-   * Includes url, regexUrl (instead of regexPattern), hasContent, and contentLength
+   * Includes pattern, regexPattern, hasContent, and contentLength
    */
   toMetadataResponse(): {
     id: string;
-    url?: string;
-    regexUrl?: string;
+    pattern?: string;
+    regexPattern?: string;
     hasContent: boolean;
     contentLength: number;
   } {
     const result: {
       id: string;
-      url?: string;
-      regexUrl?: string;
+      pattern?: string;
+      regexPattern?: string;
       hasContent: boolean;
       contentLength: number;
     } = {
@@ -149,12 +198,12 @@ export class MimicMapping implements IMimicMapping {
       contentLength: this.contentLength,
     };
 
-    if (this.url !== null) {
-      result.url = this.url;
+    if (this._pattern !== null) {
+      result.pattern = this._pattern;
     }
 
     if (this._regexPattern !== null) {
-      result.regexUrl = this._regexPattern;
+      result.regexPattern = this._regexPattern;
     }
 
     return result;
@@ -165,14 +214,14 @@ export class MimicMapping implements IMimicMapping {
    */
   toPlainObject(): {
     id: string;
-    url?: string;
+    pattern?: string;
     regex?: RegExp;
     regexPattern?: string;
     content?: Buffer;
   } {
     const obj: {
       id: string;
-      url?: string;
+      pattern?: string;
       regex?: RegExp;
       regexPattern?: string;
       content?: Buffer;
@@ -180,8 +229,8 @@ export class MimicMapping implements IMimicMapping {
       id: this.id,
     };
 
-    if (this.url !== null) {
-      obj.url = this.url;
+    if (this._pattern !== null) {
+      obj.pattern = this._pattern;
     }
 
     if (this._regex) {
