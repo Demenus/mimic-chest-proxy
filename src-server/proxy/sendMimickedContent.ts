@@ -16,7 +16,7 @@
  */
 
 import type { ServerResponse } from 'http';
-import type { MimicMapping } from '../types.js';
+import type { MimicMapping } from '../models/MimicMapping.js';
 import { detectContentType } from '../utils/index.js';
 import { logger } from '../logger.js';
 

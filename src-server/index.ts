@@ -19,14 +19,14 @@
 import { startMimicServer } from './mimic/index.js';
 import { startProxyServer } from './proxy/index.js';
 import { logger } from './logger.js';
-import { mimicMappingService } from './MimicMappingService.js';
+import { mimicMappingService } from './service/MimicMappingService.js';
 
 // Export both servers for convenience
 export { startMimicServer } from './mimic/index.js';
 export { startProxyServer } from './proxy/index.js';
 
 // Re-export common utilities and services
-export { mimicMappingService } from './MimicMappingService.js';
+export { mimicMappingService } from './service/MimicMappingService.js';
 export * from './types.js';
 export * from './utils/index.js';
 export { logger } from './logger.js';

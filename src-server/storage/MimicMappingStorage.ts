@@ -17,31 +17,23 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { MimicMapping } from '../types.js';
-
-/**
- * Storage metadata structure for index.json
- */
-interface MappingMetadata {
-  id: string;
-  url: string | null;
-  regexPattern: string | null;
-  contentLength: number;
-}
+import { MimicMapping, type IMimicMapping } from '../models/MimicMapping.js';
 
 interface StorageIndex {
-  mappings: MappingMetadata[];
+  mappings: IMimicMapping[];
 }
 
 /**
  * Storage layer for MimicMapping data
- * Handles persistence to filesystem:
+ * Handles in-memory state and persistence to filesystem:
+ * - In-memory Map for fast access
  * - index.json: Contains metadata (id, url, regexPattern)
  * - {id}.txt: Contains content for each mapping (UTF-8 text)
  */
 export class MimicMappingStorage {
   private readonly storageDir: string;
   private readonly indexPath: string;
+  private readonly mimicMappings = new Map<string, MimicMapping>();
 
   constructor(storagePath: string) {
     this.storageDir = path.resolve(storagePath);
@@ -49,17 +41,24 @@ export class MimicMappingStorage {
   }
 
   /**
-   * Initialize storage directory and load existing data
+   * Initialize storage directory and load existing data into memory
    */
   async initialize(): Promise<void> {
     // Ensure storage directory exists
     await fs.mkdir(this.storageDir, { recursive: true });
+
+    // Load existing mappings from disk into memory
+    const metadataList = await this.loadIndex();
+    for (const metadata of metadataList) {
+      const mapping = this.interfaceToMapping(metadata);
+      this.mimicMappings.set(metadata.id, mapping);
+    }
   }
 
   /**
    * Load all mappings metadata from index.json
    */
-  async loadIndex(): Promise<MappingMetadata[]> {
+  async loadIndex(): Promise<IMimicMapping[]> {
     try {
       const data = await fs.readFile(this.indexPath, 'utf-8');
       const index: StorageIndex = JSON.parse(data);
@@ -76,7 +75,7 @@ export class MimicMappingStorage {
   /**
    * Save mappings metadata to index.json
    */
-  async saveIndex(mappings: MappingMetadata[]): Promise<void> {
+  async saveIndex(mappings: IMimicMapping[]): Promise<void> {
     const index: StorageIndex = { mappings };
     await fs.writeFile(this.indexPath, JSON.stringify(index, null, 2), 'utf-8');
   }
@@ -132,14 +131,14 @@ export class MimicMappingStorage {
   }
 
   /**
-   * Convert MimicMapping to MappingMetadata (without content)
+   * Convert MimicMapping to IMimicMapping (for JSON serialization)
    */
-  mappingToMetadata(mapping: MimicMapping): MappingMetadata {
+  mappingToInterface(mapping: MimicMapping): IMimicMapping {
     return {
       id: mapping.id,
-      url: mapping.url ?? null,
-      regexPattern: mapping.regexPattern ?? null,
-      contentLength: mapping.content?.length || 0,
+      url: mapping.url,
+      regexPattern: mapping.regexPattern,
+      contentLength: mapping.contentLength,
     };
   }
 
@@ -157,27 +156,116 @@ export class MimicMappingStorage {
   }
 
   /**
-   * Convert MappingMetadata to MimicMapping (without content, content loaded separately)
+   * Convert IMimicMapping to MimicMapping (for deserialization from JSON)
+   * Content should be loaded separately
    */
-  metadataToMapping(metadata: MappingMetadata): Omit<MimicMapping, 'content'> {
-    const mapping: Omit<MimicMapping, 'content'> = {
-      id: metadata.id,
-    };
+  interfaceToMapping(data: IMimicMapping): MimicMapping {
+    return MimicMapping.fromInterface(data);
+  }
 
-    if (metadata.url) {
-      mapping.url = metadata.url;
+  /**
+   * Find a mapping by exact URL match
+   */
+  findByUrl(url: string): { id: string; mapping: MimicMapping } | undefined {
+    for (const [id, mapping] of this.mimicMappings.entries()) {
+      if (mapping.url === url) {
+        return { id, mapping };
+      }
     }
+    return undefined;
+  }
 
-    if (metadata.regexPattern) {
-      try {
-        mapping.regex = new RegExp(metadata.regexPattern);
-        mapping.regexPattern = metadata.regexPattern;
-      } catch {
-        // Skip invalid regex patterns
-        console.warn(`Invalid regex pattern for mapping ${metadata.id}: ${metadata.regexPattern}`);
+  /**
+   * Find a mapping by exact regex pattern match
+   */
+  findByRegex(regexPattern: string): { id: string; mapping: MimicMapping } | undefined {
+    for (const [id, mapping] of this.mimicMappings.entries()) {
+      if (mapping.regexPattern === regexPattern) {
+        return { id, mapping };
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Find a matching mapping by URL
+   * First checks for exact URL matches, then checks regex patterns
+   * This ensures that fixed URLs take priority over generic regex patterns
+   */
+  findMatchingMapping(url: string): MimicMapping | undefined {
+    // First pass: check all exact URL matches
+    for (const mapping of this.mimicMappings.values()) {
+      if (mapping.url !== null && mapping.url === url) {
+        return mapping;
       }
     }
 
-    return mapping;
+    // Second pass: check regex patterns (only if no exact URL match was found)
+    for (const mapping of this.mimicMappings.values()) {
+      if (mapping.matches(url)) {
+        return mapping;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Get a mapping by ID
+   */
+  get(id: string): MimicMapping | undefined {
+    return this.mimicMappings.get(id);
+  }
+
+  /**
+   * Get all mappings
+   */
+  getAll(): MimicMapping[] {
+    return Array.from(this.mimicMappings.values());
+  }
+
+  /**
+   * Set a mapping (add or update)
+   * Automatically persists to disk
+   */
+  async set(id: string, mapping: MimicMapping): Promise<void> {
+    this.mimicMappings.set(id, mapping);
+    await this.persistIndex();
+
+    // Save content if it exists
+    if (mapping.content) {
+      await this.saveContent(id, mapping.content);
+    }
+  }
+
+  /**
+   * Delete a mapping by ID
+   * Automatically persists to disk
+   */
+  async delete(id: string): Promise<boolean> {
+    const deleted = this.mimicMappings.delete(id);
+    if (!deleted) {
+      return false;
+    }
+
+    await this.persistIndex();
+    await this.deleteContent(id);
+
+    return true;
+  }
+
+  /**
+   * Persist the current index to disk
+   */
+  private async persistIndex(): Promise<void> {
+    try {
+      const metadataList = Array.from(this.mimicMappings.values()).map((m) =>
+        this.mappingToInterface(m)
+      );
+      await this.saveIndex(metadataList);
+    } catch (error) {
+      console.error('Failed to persist index:', error);
+      // Don't throw - continue operation even if persistence fails
+    }
   }
 }

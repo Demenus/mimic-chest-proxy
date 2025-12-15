@@ -16,7 +16,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
-import { mimicMappingService } from '../MimicMappingService.js';
+import { mimicMappingService } from '../service/MimicMappingService.js';
 import { parseContentFromBody } from '../utils/index.js';
 import type {
   CreateMappingRequest,
@@ -37,10 +37,9 @@ export function setupRoutes(app: Express): void {
   // GET /api/mimic - Get all mappings
   app.get(
     '/api/mimic',
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    async (req: Request, res: Response) => {
+    (req: Request, res: Response) => {
       try {
-        const mappings = await mimicMappingService.getAllMappingsWithMetadata();
+        const mappings = mimicMappingService.getAllMappingsWithMetadata();
         res.status(200).json(mappings);
       } catch (error) {
         res.status(500).json({

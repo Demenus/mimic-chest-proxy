@@ -15,7 +15,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { mimicMappingService } from '../MimicMappingService.js';
+import { mimicMappingService } from '../service/MimicMappingService.js';
 import { logger } from '../logger.js';
 import { extractTargetUrlFromMitmProxyContext } from '../utils/index.js';
 import { sendMimickedContent } from './sendMimickedContent.js';
@@ -72,7 +72,7 @@ export class RequestHandler {
     const mapping = mimicMappingService.findMatchingMapping(targetUrl);
 
     // If mapping found with content, intercept and replace
-    if (mapping?.content && ctx.serverToProxyResponse) {
+    if (mapping?.hasContent && ctx.serverToProxyResponse) {
       const responseHeaders = ctx.serverToProxyResponse.headers;
       if (!responseHeaders) {
         return callback();
@@ -106,13 +106,12 @@ export class RequestHandler {
         ctx.onResponseEnd((ctx: MitmProxyContext, callback: () => void) => {
           if (chunks.length > 0 || mapping.content) {
             // Use the mimicked content directly (we don't need the original chunks)
-            const fullMapping = { id: mapping.id, content: mapping.content as Buffer };
             const statusCode = ctx.serverToProxyResponse?.statusCode || 200;
             const headers = ctx.serverToProxyResponse?.headers;
 
             sendMimickedContent(
               ctx.proxyToClientResponse,
-              fullMapping,
+              mapping,
               targetUrl,
               statusCode,
               headers
@@ -137,9 +136,9 @@ export class RequestHandler {
    * Handle normal proxy request (no content substitution)
    * May redirect to different URL if mapping exists, otherwise proxies normally
    */
-  private handleNormalProxy(ctx: MitmProxyContext, mapping: { url?: string } | undefined, targetUrl: string, callback: () => void): void {
+  private handleNormalProxy(ctx: MitmProxyContext, mapping: { url: string | null } | undefined, targetUrl: string, callback: () => void): void {
     // If mapping found with URL redirect, update proxy target
-    if (mapping?.url && mapping.url !== targetUrl) {
+    if (mapping?.url && mapping.url !== null && mapping.url !== targetUrl) {
       const mappedUrlObj = new URL(mapping.url);
       const originalUrlObj = new URL(targetUrl);
 
