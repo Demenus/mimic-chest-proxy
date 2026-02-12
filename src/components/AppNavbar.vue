@@ -24,11 +24,30 @@
         v-if="isElectron"
         color="primary"
         unelevated
-        label="Launch"
+        label="Chrome"
         icon="fa-brands fa-chrome"
-        :loading="isLaunching"
+        :loading="isLaunchingChrome"
         @click="handleLaunchChrome"
-        class="chrome-button"
+        class="launch-button"
+      />
+      <q-btn
+        v-if="isElectron"
+        color="primary"
+        unelevated
+        label="Safari"
+        icon="fa-brands fa-safari"
+        :loading="isLaunchingSafari"
+        @click="handleLaunchSafari"
+        class="launch-button"
+      />
+      <q-btn
+        v-if="isElectron"
+        flat
+        dense
+        label="Restore proxy"
+        icon="link_off"
+        @click="handleRestoreProxy"
+        class="restore-proxy-button"
       />
     </q-toolbar>
   </q-header>
@@ -40,7 +59,8 @@ import { useQuasar } from 'quasar';
 import AppLogo from 'components/AppLogo.vue';
 
 const $q = useQuasar();
-const isLaunching = ref(false);
+const isLaunchingChrome = ref(false);
+const isLaunchingSafari = ref(false);
 const isElectron = ref(false);
 
 onMounted(() => {
@@ -58,7 +78,7 @@ async function handleLaunchChrome() {
     return;
   }
 
-  isLaunching.value = true;
+  isLaunchingChrome.value = true;
 
   try {
     const result = await window.electronAPI.launchMimicChrome();
@@ -86,7 +106,68 @@ async function handleLaunchChrome() {
       timeout: 5000,
     });
   } finally {
-    isLaunching.value = false;
+    isLaunchingChrome.value = false;
+  }
+}
+
+async function handleLaunchSafari() {
+  if (!isElectron.value || !window.electronAPI) {
+    $q.notify({
+      type: 'negative',
+      message: 'This feature is only available in Electron',
+      position: 'top',
+    });
+    return;
+  }
+
+  isLaunchingSafari.value = true;
+
+  try {
+    const result = await window.electronAPI.launchMimicSafari();
+
+    if (result.success) {
+      $q.notify({
+        type: 'positive',
+        message: 'Safari launched with Mimic proxy. System proxy was set; it will be restored when you quit the app.',
+        position: 'top',
+        timeout: 4000,
+      });
+    } else {
+      $q.notify({
+        type: 'negative',
+        message: result.error || 'Failed to launch Safari',
+        position: 'top',
+        timeout: 5000,
+      });
+    }
+  } catch (error) {
+    $q.notify({
+      type: 'negative',
+      message: `Error launching Safari: ${error instanceof Error ? error.message : String(error)}`,
+      position: 'top',
+      timeout: 5000,
+    });
+  } finally {
+    isLaunchingSafari.value = false;
+  }
+}
+
+async function handleRestoreProxy() {
+  if (!isElectron.value || !window.electronAPI?.restoreSystemProxy) return;
+  try {
+    await window.electronAPI.restoreSystemProxy();
+    $q.notify({
+      type: 'positive',
+      message: 'System proxy restored. Other browsers should work again.',
+      position: 'top',
+      timeout: 3000,
+    });
+  } catch {
+    $q.notify({
+      type: 'negative',
+      message: 'Could not restore proxy',
+      position: 'top',
+    });
   }
 }
 </script>
@@ -96,7 +177,11 @@ async function handleLaunchChrome() {
   background-color: #8b4513 !important; /* Darker brick/terracotta for navbar */
 }
 
-.chrome-button {
+.launch-button {
   margin-right: 8px;
+}
+
+.restore-proxy-button {
+  margin-left: 4px;
 }
 </style>

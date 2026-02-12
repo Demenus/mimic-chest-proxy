@@ -23,7 +23,7 @@ import { mimicMappingService } from './service/MimicMappingService.js';
 
 // Export both servers for convenience
 export { startMimicServer } from './mimic/index.js';
-export { startProxyServer } from './proxy/index.js';
+export { startProxyServer, getProxyCaDir } from './proxy/index.js';
 
 // Re-export common utilities and services
 export { mimicMappingService } from './service/MimicMappingService.js';

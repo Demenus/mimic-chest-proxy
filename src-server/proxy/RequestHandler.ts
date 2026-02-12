@@ -15,121 +15,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { mimicMappingService } from '../service/MimicMappingService.js';
 import { logger } from '../logger.js';
 import { extractTargetUrlFromMitmProxyContext } from '../utils/index.js';
-import { sendMimickedContent } from './sendMimickedContent.js';
-
-// Type for http-mitm-proxy context
-interface MitmProxyContext {
-  clientToProxyRequest: {
-    url?: string;
-    method?: string;
-    headers: Record<string, string | string[] | undefined>;
-  };
-  proxyToServerRequestOptions: {
-    host?: string;
-    port?: number;
-    protocol?: string;
-    path?: string;
-    rejectUnauthorized?: boolean;
-  };
-  proxyToClientResponse: {
-    writeHead: (statusCode: number, statusMessage?: string, headers?: Record<string, string>) => void;
-    write: (chunk: unknown) => void;
-    end: (chunk?: unknown) => void;
-    headersSent: boolean;
-  };
-  serverToProxyResponse?: {
-    statusCode?: number;
-    headers?: Record<string, string | string[] | undefined>;
-  };
-  onResponseHeaders?: (handler: (ctx: MitmProxyContext, callback: () => void) => void) => void;
-  onResponseData: (handler: (ctx: MitmProxyContext, chunk: Buffer, callback: (err: Error | null, chunk: Buffer | null) => void) => void) => void;
-  onResponseEnd: (handler: (ctx: MitmProxyContext, callback: () => void) => void) => void;
-  isSSL?: boolean;
-}
+import { getInterceptionDecision, type MimicMappingFinder } from './interception.js';
+import { substituteResponse } from './ResponseSubstitution.js';
+import type { MitmProxyContext } from './types.js';
 
 /**
- * Request handler class - simplified version following the example pattern
+ * Request handler class - delegates interception decision and response substitution to dedicated modules.
+ * Receives a mapping finder so the proxy layer does not depend on a concrete service (testable, swappable).
  */
 export class RequestHandler {
+  constructor(private readonly mappingFinder: MimicMappingFinder) {}
 
   /**
-   * Handle response that needs content substitution (mimicked content)
-   * Intercepts response in onResponse hook, following simple-proxy.js pattern
-   * Accumulates chunks and replaces with mimicked content
+   * Handle response: decide whether to substitute with mimicked content, then substitute or pass through.
    */
   public handleResponse(ctx: MitmProxyContext, callback: () => void): void {
-    const targetUrl = extractTargetUrlFromMitmProxyContext(ctx);
-
-    if (!targetUrl) {
-      logger.warn('Cannot determine target URL in response handler');
+    const decision = getInterceptionDecision(ctx, this.mappingFinder);
+    if (!decision) {
       return callback();
     }
-
-    // Find matching mapping
-    const mapping = mimicMappingService.findMatchingMapping(targetUrl);
-
-    // If mapping found with content, intercept and replace
-    if (mapping?.hasContent && ctx.serverToProxyResponse) {
-      const responseHeaders = ctx.serverToProxyResponse.headers;
-      if (!responseHeaders) {
-        return callback();
-      }
-
-      const contentType = responseHeaders['content-type'] || '';
-
-      // Only intercept HTML or JavaScript responses (as per user requirement)
-      if (contentType.includes('text/html') || contentType.includes('application/javascript') || contentType.includes('text/javascript')) {
-        logger.info('Intercepting response for content substitution', {
-          targetUrl,
-          mappingId: mapping.id,
-          contentType,
-        });
-
-        // Store original chunks to modify later (following simple-proxy.js pattern)
-        const chunks: Buffer[] = [];
-
-        // Remove content-length header since we'll modify the content
-        delete responseHeaders['content-length'];
-        delete responseHeaders['Content-Length'];
-
-        // Intercept response data to collect chunks
-        ctx.onResponseData((ctx: MitmProxyContext, chunk: Buffer, callback: (err: Error | null, chunk: Buffer | null) => void) => {
-          chunks.push(chunk);
-          // Don't send this chunk yet, we'll send modified content later
-          return callback(null, null);
-        });
-
-        // Modify and send response when complete
-        ctx.onResponseEnd((ctx: MitmProxyContext, callback: () => void) => {
-          if (chunks.length > 0 || mapping.content) {
-            // Use the mimicked content directly (we don't need the original chunks)
-            const statusCode = ctx.serverToProxyResponse?.statusCode || 200;
-            const headers = ctx.serverToProxyResponse?.headers;
-
-            sendMimickedContent(
-              ctx.proxyToClientResponse,
-              mapping,
-              targetUrl,
-              statusCode,
-              headers
-            );
-
-            logger.info('Replaced content with mimicked content', { targetUrl, mappingId: mapping.id });
-          } else {
-            logger.warn('No chunks collected and no mimicked content', { targetUrl });
-          }
-          return callback();
-        });
-
-        return callback();
-      }
-    }
-
-    // No content substitution needed, continue normally
-    return callback();
+    logger.info('Mimicked URL', { url: decision.targetUrl, mappingId: decision.mapping.id });
+    substituteResponse(ctx, decision, callback);
   }
 
   /**
@@ -143,8 +51,9 @@ export class RequestHandler {
   }
 
   /**
-   * Handle a proxy request using http-mitm-proxy context
-   * Only handles URL redirections here, content substitution is done in handleResponse
+   * Handle a proxy request. Content substitution is done in handleResponse.
+   * The request-phase mapping lookup is intentional: it can warm the mapping (e.g. ensure it is
+   * in memory) before the response arrives. Patterns are used for matching only, not URL redirection.
    */
   public handleRequest(ctx: MitmProxyContext, callback: () => void): void {
     const targetUrl = extractTargetUrlFromMitmProxyContext(ctx);
@@ -155,11 +64,9 @@ export class RequestHandler {
       return callback();
     }
 
-    // Find matching mapping (for potential content substitution in handleResponse)
-    // Patterns are only used for matching, not URL redirection
-    void mimicMappingService.findMatchingMapping(targetUrl);
+    // Look up mapping in request phase (used e.g. to warm cache for handleResponse)
+    void this.mappingFinder.findMatchingMapping(targetUrl);
 
-    // Normal proxy behavior
     return this.handleNormalProxy(ctx, callback);
   }
 }

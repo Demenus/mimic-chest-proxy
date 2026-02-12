@@ -18,59 +18,20 @@
 import { createRequire } from 'module';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type { Server } from 'net';
 import { logger } from '../logger.js';
+import { mimicMappingService } from '../service/MimicMappingService.js';
 import { RequestHandler } from './RequestHandler.js';
 import { silencePackageLogs } from '../utils/console-silencer.js';
+import type { MitmProxyContext, MitmProxyInstance } from './types.js';
 
-// Silence console logs from http-mitm-proxy before importing it
-silencePackageLogs('http-mitm-proxy');
+// Silence console logs from http-mitm-proxy (including Socket/parse errors from non-HTTP traffic)
+silencePackageLogs('http-mitm-proxy', { silenceError: true });
 
 const require = createRequire(import.meta.url);
 const Proxy = require('http-mitm-proxy').Proxy;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Type for http-mitm-proxy context
-interface MitmProxyContext {
-  clientToProxyRequest: {
-    url?: string;
-    method?: string;
-    headers: Record<string, string | string[] | undefined>;
-  };
-  proxyToServerRequestOptions: {
-    host?: string;
-    port?: number;
-    protocol?: string;
-    path?: string;
-    rejectUnauthorized?: boolean;
-  };
-  proxyToClientResponse: {
-    writeHead: (statusCode: number, statusMessage?: string, headers?: Record<string, string>) => void;
-    write: (chunk: unknown) => void;
-    end: (chunk?: unknown) => void;
-    headersSent: boolean;
-  };
-  serverToProxyResponse?: {
-    statusCode?: number;
-    headers?: Record<string, string | string[] | undefined>;
-  };
-  onResponseData: (handler: (ctx: MitmProxyContext, chunk: Buffer, callback: (err: Error | null, chunk: Buffer | null) => void) => void) => void;
-  onResponseEnd: (handler: (ctx: MitmProxyContext, callback: () => void) => void) => void;
-  isSSL?: boolean;
-}
-
-// Type for http-mitm-proxy instance
-interface MitmProxyInstance {
-  onError: (handler: (ctx: MitmProxyContext | null, err: Error, errorKind: string) => void) => void;
-  use: (middleware: unknown) => void;
-  onRequest: (handler: (ctx: MitmProxyContext, callback: () => void) => void) => void;
-  onResponse: (handler: (ctx: MitmProxyContext, callback: () => void) => void) => void;
-  listen: (options: { port: number; host: string; silent: boolean; sslCaDir: string }, callback: () => void) => void;
-  httpsServer?: Server;
-  httpServer?: Server;
-}
 
 /**
  * Proxy server class that handles HTTP proxy requests using http-mitm-proxy
@@ -82,7 +43,7 @@ export class ProxyServer {
   private caDir: string;
 
   constructor() {
-    this.requestHandler = new RequestHandler();
+    this.requestHandler = new RequestHandler(mimicMappingService);
     const projectRoot = join(__dirname, '../../..');
     const certDir = join(projectRoot, 'certs');
     this.caDir = join(certDir, 'ca');
@@ -102,7 +63,22 @@ export class ProxyServer {
 
       proxyInstance.onError((ctx: MitmProxyContext | null, err: Error, errorKind: string) => {
         const url = ctx?.clientToProxyRequest?.url || 'unknown';
-        logger.error('Proxy error', { errorKind, url, error: err.message || String(err) });
+        const msg = err.message || String(err);
+        const isCommonNoise =
+          errorKind === 'HTTPS_CLIENT_ERROR' &&
+          (msg.includes('ECONNRESET') ||
+            msg.includes('socket hang up') ||
+            msg.includes('Parse Error') ||
+            msg.includes('HPE_INVALID_METHOD'));
+        if (isCommonNoise) {
+          logger.debug('Proxy client/parse noise (non-HTTP or closed connection)', {
+            errorKind,
+            url,
+            error: msg,
+          });
+        } else {
+          logger.error('Proxy error', { errorKind, url, error: msg });
+        }
       });
 
       proxyInstance.use(Proxy.gunzip);
