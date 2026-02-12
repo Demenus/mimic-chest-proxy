@@ -18,28 +18,16 @@
 <template>
   <div class="url-input-section">
     <div class="section-description">
-      Register a glob pattern or regex pattern to intercept and modify its content
+      Register a glob pattern to intercept and modify its content
     </div>
     <q-input
       :model-value="modelValue"
-      :label="inputMode === 'url' ? 'Glob Pattern' : 'Regex Pattern'"
+      label="Glob Pattern"
       filled
       class="url-input"
       @update:model-value="handleValueUpdate"
       @keydown.enter.prevent="handleSubmit"
     >
-      <template v-slot:prepend>
-        <q-btn-toggle
-          :model-value="inputMode"
-          toggle-color="primary"
-          :options="[
-            { label: 'Glob', value: 'url' },
-            { label: 'Regex', value: 'regex' },
-          ]"
-          class="mode-toggle"
-          @update:model-value="(val) => $emit('update:inputMode', val)"
-        />
-      </template>
       <template v-slot:append>
         <q-btn
           round
@@ -59,7 +47,6 @@
 <script setup lang="ts">
 export interface Props {
   modelValue: string;
-  inputMode: 'url' | 'regex';
   isSubmitting?: boolean;
 }
 
@@ -69,7 +56,6 @@ withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
-  'update:inputMode': [value: 'url' | 'regex'];
   submit: [];
 }>();
 
@@ -104,13 +90,5 @@ function handleSubmit() {
 
 .url-input {
   width: 100%;
-}
-
-.mode-toggle {
-  margin-right: 8px;
-}
-
-:deep(.q-field__prepend) {
-  padding-right: 8px;
 }
 </style>

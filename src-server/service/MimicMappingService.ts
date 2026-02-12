@@ -21,7 +21,7 @@ import { MimicMappingStorage } from '../storage/MimicMappingStorage.js';
 
 /**
  * Service for managing mimic mappings
- * Handles creation, retrieval, updating, and deletion of URL and regex mappings
+ * Handles creation, retrieval, updating, and deletion of glob pattern mappings
  */
 export class MimicMappingService {
   private storage: MimicMappingStorage | null = null;
@@ -49,8 +49,10 @@ export class MimicMappingService {
   }
 
   /**
-   * Normalize a bare host/domain (e.g. "google.com") into a glob that matches any URL containing it.
-   * So "google.com" becomes "**google.com**" and will match "https://www.google.com/".
+   * Normalize a bare host/domain (e.g. "google.com") into a glob that matches any URL for that domain.
+   * - "google.com" -> "*://*google.com/**" matches https://www.google.com, https://google.com,
+   *   http://mail.google.com/inbox, etc.
+   * - Patterns with wildcards or explicit protocol are left unchanged.
    */
   private normalizeGlobPattern(pattern: string): string {
     const trimmed = pattern.trim();
@@ -58,57 +60,35 @@ export class MimicMappingService {
       return trimmed;
     }
     const hasWildcards = /\*|\?/.test(trimmed);
-    const hasProtocol = /^https?:\/\//i.test(trimmed);
+    const hasProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
     if (hasWildcards || hasProtocol) {
       return trimmed;
     }
-    return `**${trimmed}**`;
+    return `*://*${trimmed}*/**`;
   }
 
   /**
-   * Create a new mapping for a glob pattern or regex pattern
-   * If a mapping with the same pattern or regexPattern already exists, it will be overwritten.
+   * Create a new mapping for a glob pattern
+   * If a mapping with the same pattern already exists, it will be overwritten.
    * Bare host names (e.g. "google.com") are normalized to a glob that matches any URL containing them.
    */
-  async createMapping(pattern?: string, regexPattern?: string): Promise<MimicMapping> {
+  async createMapping(pattern: string): Promise<MimicMapping> {
     if (!this.storage) {
       throw new Error('Storage not initialized');
     }
 
-    if (pattern) {
-      pattern = this.normalizeGlobPattern(pattern);
-    }
+    pattern = this.normalizeGlobPattern(pattern);
 
-    // Check if a mapping with the same pattern or regexPattern already exists
-    let existing: { id: string; mapping: MimicMapping } | undefined;
+    const existing = this.storage.findByPattern(pattern);
 
-    if (pattern) {
-      existing = this.storage.findByPattern(pattern);
-    } else if (regexPattern) {
-      existing = this.storage.findByRegex(regexPattern);
-    } else {
-      throw new Error('Either pattern or regexPattern must be provided');
-    }
-
-    // If existing mapping found, update it; otherwise create new one
     if (existing) {
-      // Overwrite existing mapping, preserving content if it exists
-      if (pattern) {
-        existing.mapping.setPattern(pattern);
-        // Clear regex if it was a regex mapping before
-        existing.mapping.clearRegex();
-      } else if (regexPattern) {
-        existing.mapping.setRegexPattern(regexPattern);
-        // Clear pattern if it was a glob pattern mapping before
-        existing.mapping.clearPattern();
-      }
+      existing.mapping.setPattern(pattern);
       await this.storage.set(existing.id, existing.mapping);
       return existing.mapping;
     }
 
-    // Create new mapping
     const id = randomUUID();
-    const mapping = new MimicMapping(id, pattern ?? null, regexPattern ?? null);
+    const mapping = new MimicMapping(id, pattern);
 
     await this.storage.set(id, mapping);
     return mapping;
@@ -162,9 +142,7 @@ export class MimicMappingService {
   }
 
   /**
-   * Find a matching mapping by URL
-   * First checks for glob patterns, then checks regex patterns
-   * This ensures that glob patterns are checked before regex patterns
+   * Find a matching mapping by URL using glob patterns
    */
   findMatchingMapping(url: string): MimicMapping | undefined {
     if (!this.storage) {
@@ -225,7 +203,6 @@ export class MimicMappingService {
   getAllMappingsWithMetadata(): Array<{
     id: string;
     pattern?: string;
-    regexPattern?: string;
     hasContent: boolean;
     contentLength: number;
   }> {

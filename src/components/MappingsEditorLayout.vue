@@ -22,7 +22,7 @@
       <q-card flat bordered class="empty-state-card">
         <q-card-section class="empty-state-content">
           <div class="empty-state-title">No mappings registered yet</div>
-          <div class="empty-state-message">Add a URL or regex pattern above to get started.</div>
+          <div class="empty-state-message">Add a glob pattern above to get started.</div>
         </q-card-section>
       </q-card>
     </div>

@@ -22,37 +22,32 @@
 export interface IMimicMapping {
   id: string;
   pattern: string | null;
-  regexPattern: string | null;
   contentLength: number;
 }
 
 import picomatch from 'picomatch';
 
 /**
- * MimicMapping class that encapsulates glob pattern and regex pattern mapping logic
- * Handles both glob pattern matching (using picomatch) and regex pattern matching for content mimicry
+ * MimicMapping class that encapsulates glob pattern mapping logic
+ * Handles glob pattern matching (using picomatch) for content mimicry
  */
 export class MimicMapping implements IMimicMapping {
   public readonly id: string;
   private _pattern: string | null = null;
   private _picomatchMatcher: ((str: string) => boolean) | undefined;
-  private _regex: RegExp | undefined;
-  private _regexPattern: string | null = null;
+  private _persistedContentLength = 0;
   public content: Buffer | undefined;
 
-  constructor(id: string, pattern?: string | null, regexPattern?: string | null, content?: Buffer) {
+  constructor(id: string, pattern?: string | null, content?: Buffer) {
     this.id = id;
     if (pattern) {
       this.setPattern(pattern);
-    }
-    if (regexPattern) {
-      this.setRegexPattern(regexPattern);
     }
     this.content = content;
   }
 
   get hasContent(): boolean {
-    return this.content !== undefined;
+    return (this.content?.length ?? 0) > 0 || this._persistedContentLength > 0;
   }
 
   /**
@@ -63,24 +58,10 @@ export class MimicMapping implements IMimicMapping {
   }
 
   /**
-   * Get the regex pattern string
-   */
-  get regexPattern(): string | null {
-    return this._regexPattern;
-  }
-
-  /**
    * Get contentLength for IMimicMapping interface compliance
    */
   get contentLength(): number {
-    return this.content?.length || 0;
-  }
-
-  /**
-   * Get the regex RegExp object
-   */
-  get regex(): RegExp | undefined {
-    return this._regex;
+    return this.content?.length ?? this._persistedContentLength;
   }
 
   /**
@@ -105,54 +86,23 @@ export class MimicMapping implements IMimicMapping {
   }
 
   /**
-   * Set the regex pattern and create the RegExp object
-   * Throws error if pattern is invalid
-   */
-  setRegexPattern(pattern: string): void {
-    this._regexPattern = pattern;
-    try {
-      this._regex = new RegExp(pattern);
-    } catch (error) {
-      throw new Error(`Invalid regex pattern: ${String(error)}`);
-    }
-  }
-
-  /**
-   * Clear regex pattern and RegExp
-   */
-  clearRegex(): void {
-    this._regex = undefined;
-    this._regexPattern = null;
-  }
-
-  /**
    * Check if this mapping matches a given URL
-   * First checks glob pattern (using picomatch), then regex pattern
    */
   matches(url: string): boolean {
-    // First try glob pattern matching
     if (this._pattern !== null && this._picomatchMatcher) {
-      if (this._picomatchMatcher(url)) {
-        return true;
-      }
+      return this._picomatchMatcher(url);
     }
-
-    // Then try regex pattern matching
-    if (this._regexPattern !== null && this._regex) {
-      if (this._regex.test(url)) {
-        return true;
-      }
-    }
-
     return false;
   }
 
   /**
    * Create MimicMapping from IMimicMapping (for deserialization from JSON)
    * Content should be loaded separately
+   * Skips mappings without pattern (e.g. legacy regex-only mappings)
    */
   static fromInterface(data: IMimicMapping): MimicMapping {
     const mapping = new MimicMapping(data.id);
+    mapping._persistedContentLength = data.contentLength ?? 0;
 
     if (data.pattern) {
       try {
@@ -163,33 +113,22 @@ export class MimicMapping implements IMimicMapping {
       }
     }
 
-    if (data.regexPattern) {
-      try {
-        mapping.setRegexPattern(data.regexPattern);
-      } catch {
-        // Skip invalid regex patterns
-        console.warn(`Invalid regex pattern for mapping ${data.id}: ${data.regexPattern}`);
-      }
-    }
-
     return mapping;
   }
 
   /**
    * Create a metadata response object (for API responses)
-   * Includes pattern, regexPattern, hasContent, and contentLength
+   * hasContent is true when contentLength > 0 (from in-memory content or persisted index)
    */
   toMetadataResponse(): {
     id: string;
     pattern?: string;
-    regexPattern?: string;
     hasContent: boolean;
     contentLength: number;
   } {
     const result: {
       id: string;
       pattern?: string;
-      regexPattern?: string;
       hasContent: boolean;
       contentLength: number;
     } = {
@@ -202,10 +141,6 @@ export class MimicMapping implements IMimicMapping {
       result.pattern = this._pattern;
     }
 
-    if (this._regexPattern !== null) {
-      result.regexPattern = this._regexPattern;
-    }
-
     return result;
   }
 
@@ -215,15 +150,11 @@ export class MimicMapping implements IMimicMapping {
   toPlainObject(): {
     id: string;
     pattern?: string;
-    regex?: RegExp;
-    regexPattern?: string;
     content?: Buffer;
   } {
     const obj: {
       id: string;
       pattern?: string;
-      regex?: RegExp;
-      regexPattern?: string;
       content?: Buffer;
     } = {
       id: this.id,
@@ -231,14 +162,6 @@ export class MimicMapping implements IMimicMapping {
 
     if (this._pattern !== null) {
       obj.pattern = this._pattern;
-    }
-
-    if (this._regex) {
-      obj.regex = this._regex;
-    }
-
-    if (this._regexPattern !== null) {
-      obj.regexPattern = this._regexPattern;
     }
 
     if (this.content) {

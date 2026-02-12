@@ -4,7 +4,6 @@
       <!-- URL Input Section -->
       <UrlInputSection
         v-model="urlInput"
-        v-model:input-mode="inputMode"
         :is-submitting="mimicStore.isSubmitting"
         @submit="handleSubmitUrl"
       />
@@ -36,7 +35,6 @@ import MappingsEditorLayout from 'components/MappingsEditorLayout.vue';
 const $q = useQuasar();
 const mimicStore = useMimicStore();
 const urlInput = ref('');
-const inputMode = ref<'url' | 'regex'>('url');
 
 // Computed properties for v-model binding with store
 const editorContent = computed({
@@ -103,16 +101,11 @@ async function handleSubmitUrl() {
   }
 
   try {
-    const payload =
-      inputMode.value === 'url'
-        ? { pattern: urlInput.value.trim() }
-        : { regexPattern: urlInput.value.trim() };
-
-    await mimicStore.createMapping(payload);
+    await mimicStore.createMapping({ pattern: urlInput.value.trim() });
 
     $q.notify({
       type: 'positive',
-      message: `Successfully registered ${inputMode.value === 'url' ? 'glob pattern' : 'regex pattern'}!`,
+      message: 'Successfully registered glob pattern!',
       position: 'top',
       timeout: 3000,
     });
@@ -122,7 +115,7 @@ async function handleSubmitUrl() {
   } catch (error) {
     $q.notify({
       type: 'negative',
-      message: `Failed to register ${inputMode.value === 'url' ? 'glob pattern' : 'regex pattern'}: ${
+      message: `Failed to register glob pattern: ${
         error instanceof Error ? error.message : String(error)
       }`,
       position: 'top',

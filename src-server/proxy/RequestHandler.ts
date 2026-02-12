@@ -30,14 +30,16 @@ export class RequestHandler {
 
   /**
    * Handle response: decide whether to substitute with mimicked content, then substitute or pass through.
+   * Uses async finder to load content; if content does not exist, passes through original response.
    */
   public handleResponse(ctx: MitmProxyContext, callback: () => void): void {
-    const decision = getInterceptionDecision(ctx, this.mappingFinder);
-    if (!decision) {
-      return callback();
-    }
-    logger.info('Mimicked URL', { url: decision.targetUrl, mappingId: decision.mapping.id });
-    substituteResponse(ctx, decision, callback);
+    void getInterceptionDecision(ctx, this.mappingFinder).then((decision) => {
+      if (!decision) {
+        return callback();
+      }
+      logger.info('Mimicked URL', { url: decision.targetUrl, mappingId: decision.mapping.id });
+      substituteResponse(ctx, decision, callback);
+    });
   }
 
   /**

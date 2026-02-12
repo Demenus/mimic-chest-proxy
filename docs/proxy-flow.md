@@ -68,7 +68,7 @@ sequenceDiagram
 
 Interception is allowed only when:
 
-- The response has a matching mapping (glob or regex) for the request URL.
+- The response has a matching mapping (glob pattern) for the request URL.
 - The mapping has content (replacement body) set.
 - The response `Content-Type` is one of: `text/html`, `application/javascript`, `text/javascript`.
 

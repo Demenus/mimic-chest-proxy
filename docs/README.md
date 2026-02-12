@@ -1,6 +1,6 @@
 # Mimic Chest Proxy — Documentation
 
-Mimic Chest Proxy is an HTTP/HTTPS reverse proxy that can substitute responses with custom content. You define URL patterns (glob or regex), assign replacement content (HTML, JavaScript, etc.), and traffic matching those patterns is served your content instead of the origin.
+Mimic Chest Proxy is an HTTP/HTTPS reverse proxy that can substitute responses with custom content. You define glob URL patterns, assign replacement content (HTML, JavaScript, etc.), and traffic matching those patterns is served your content instead of the origin.
 
 This folder documents the server-side architecture and flows.
 

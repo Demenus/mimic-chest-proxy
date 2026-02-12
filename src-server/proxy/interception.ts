@@ -25,6 +25,7 @@ import type { MitmProxyContext } from './types.js';
  */
 export interface MimicMappingFinder {
   findMatchingMapping(url: string): MimicMapping | undefined;
+  findMatchingMappingAsync(url: string): Promise<MimicMapping | undefined>;
 }
 
 /**
@@ -47,19 +48,19 @@ function isInterceptableContentType(contentType: string): boolean {
 
 /**
  * Decides whether to intercept this response and replace it with mimicked content.
- * Returns an InterceptionDecision if we should substitute; null otherwise.
+ * Uses async finder to load content from disk; returns null if content does not exist.
  */
-export function getInterceptionDecision(
+export async function getInterceptionDecision(
   ctx: MitmProxyContext,
   finder: MimicMappingFinder
-): InterceptionDecision | null {
+): Promise<InterceptionDecision | null> {
   const targetUrl = extractTargetUrlFromMitmProxyContext(ctx);
   if (!targetUrl) {
     return null;
   }
 
-  const mapping = finder.findMatchingMapping(targetUrl);
-  if (!mapping?.hasContent || !ctx.serverToProxyResponse?.headers) {
+  const mapping = await finder.findMatchingMappingAsync(targetUrl);
+  if (!mapping?.content || !ctx.serverToProxyResponse?.headers) {
     return null;
   }
 

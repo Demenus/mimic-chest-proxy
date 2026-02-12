@@ -27,7 +27,7 @@
         :active="selectedId === mapping.id"
       >
         <q-item-section>
-          <q-item-label>{{ mapping.pattern || mapping.regexPattern || 'No pattern' }}</q-item-label>
+          <q-item-label>{{ mapping.pattern || 'No pattern' }}</q-item-label>
           <q-item-label caption>ID: {{ mapping.id }}</q-item-label>
         </q-item-section>
         <q-item-section side>
@@ -57,7 +57,6 @@
 export interface Mapping {
   id: string;
   pattern?: string;
-  regexPattern?: string;
   hasContent: boolean;
   contentLength: number;
 }
