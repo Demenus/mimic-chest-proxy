@@ -30,8 +30,11 @@ const currentDir = fileURLToPath(new URL('.', import.meta.url));
 
 let mainWindow: BrowserWindow | undefined;
 let serverPorts: ServerPorts | null = null;
+let userDataPath: string = '';
 const chromeLauncher = new ChromeLauncher();
 const safariLauncher = new SafariLauncher();
+
+const SAFARI_PROXY_STATE_FILE = 'safari-proxy-state.json';
 
 async function createWindow() {
   /**
@@ -89,7 +92,8 @@ ipcMain.handle('launch-mimic-safari', () => {
     };
   }
   const caDir = getProxyCaDir();
-  return safariLauncher.launch(serverPorts.proxyPort, { caDir: caDir ?? null });
+  const stateFilePath = userDataPath ? path.join(userDataPath, SAFARI_PROXY_STATE_FILE) : null;
+  return safariLauncher.launch(serverPorts.proxyPort, { caDir: caDir ?? null, stateFilePath });
 });
 
 ipcMain.handle('restore-system-proxy', () => {
@@ -111,8 +115,14 @@ ipcMain.handle('get-proxy-server-port', () => {
 
 void app.whenReady().then(async () => {
   await createWindow();
-  const userDataPath = app.getPath('userData');
+  userDataPath = app.getPath('userData');
   serverPorts = await startServers(userDataPath);
+  if (process.platform === 'darwin') {
+    const stateFile = path.join(userDataPath, SAFARI_PROXY_STATE_FILE);
+    if (safariLauncher.restoreFromSavedFile(stateFile)) {
+      console.log('[SafariLauncher] Restored system proxy from previous session (crash recovery)');
+    }
+  }
   console.log(`Mimic server started on port ${serverPorts.mimicPort}`);
   console.log(`Proxy server started on port ${serverPorts.proxyPort}`);
 });
@@ -124,6 +134,9 @@ app.on('before-quit', () => {
 });
 
 app.on('window-all-closed', () => {
+  // On all platforms: restore proxy and close launched browsers when the user closes the last window
+  chromeLauncher.close();
+  safariLauncher.close();
   if (platform !== 'darwin') {
     app.quit();
   }

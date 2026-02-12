@@ -16,7 +16,7 @@
  */
 
 import { execFileSync, execSync, spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export interface LaunchResult {
@@ -51,10 +51,17 @@ interface ServiceProxyState {
   state: SavedProxyState;
 }
 
+/** Persisted file format for crash recovery */
+interface PersistedProxyStateFile {
+  savedAt: string;
+  services: ServiceProxyState[];
+}
+
 export class SafariLauncher {
   private savedProxyStates: ServiceProxyState[] = [];
   private certAddedToKeychain = false;
   private caCertPathUsed: string | null = null;
+  private stateFilePath: string | null = null;
 
   /**
    * Only supported on macOS (darwin). Safari + networksetup are macOS-specific.
@@ -66,6 +73,7 @@ export class SafariLauncher {
   /**
    * Get all enabled network service names for networksetup.
    * List format: "* Ethernet" = disabled, "Wi-Fi" = enabled.
+   * Skips the explanatory line "An asterisk (*) denotes..." (and localized variants).
    */
   private getEnabledNetworkServices(): string[] {
     const services: string[] = [];
@@ -76,7 +84,9 @@ export class SafariLauncher {
       const lines = out.split('\n').filter((l) => l.trim());
       for (const line of lines) {
         const name = line.replace(/^\*\s*/, '').trim();
-        if (!name || name === 'An asterisk (*) denotes that a network service is disabled') continue;
+        if (!name) continue;
+        // Skip the header line (English and localized, e.g. "An asterisk (*) denotes that...")
+        if (name.includes('(*)')) continue;
         if (!line.startsWith('*')) services.push(name);
       }
     } catch (err) {
@@ -130,26 +140,34 @@ export class SafariLauncher {
     }
   }
 
+  /**
+   * Apply saved proxy state to the system via networksetup.
+   * Used both when restoring from memory and when restoring from persisted file after a crash.
+   */
+  private applyRestoredStates(states: ServiceProxyState[]): void {
+    for (const { service, state: s } of states) {
+      try {
+        execFileSync(NETWORKSETUP, ['-setwebproxy', service, s.webServer, s.webPort], {
+          stdio: 'ignore',
+        });
+        execFileSync(NETWORKSETUP, ['-setsecurewebproxy', service, s.secureServer, s.securePort], {
+          stdio: 'ignore',
+        });
+        execFileSync(NETWORKSETUP, ['-setwebproxystate', service, s.webEnabled === 'Yes' ? 'on' : 'off'], {
+          stdio: 'ignore',
+        });
+        execFileSync(NETWORKSETUP, ['-setsecurewebproxystate', service, s.secureEnabled === 'Yes' ? 'on' : 'off'], {
+          stdio: 'ignore',
+        });
+      } catch (err) {
+        console.error(`Failed to restore proxy state for ${service}:`, err);
+      }
+    }
+  }
+
   private restoreProxyState(): void {
     if (this.savedProxyStates.length > 0) {
-      for (const { service, state: s } of this.savedProxyStates) {
-        try {
-          execFileSync(NETWORKSETUP, ['-setwebproxy', service, s.webServer, s.webPort, 'off'], {
-            stdio: 'ignore',
-          });
-          execFileSync(NETWORKSETUP, ['-setsecurewebproxy', service, s.secureServer, s.securePort, 'off'], {
-            stdio: 'ignore',
-          });
-          execFileSync(NETWORKSETUP, ['-setwebproxystate', service, s.webEnabled === 'Yes' ? 'on' : 'off'], {
-            stdio: 'ignore',
-          });
-          execFileSync(NETWORKSETUP, ['-setsecurewebproxystate', service, s.secureEnabled === 'Yes' ? 'on' : 'off'], {
-            stdio: 'ignore',
-          });
-        } catch (err) {
-          console.error(`Failed to restore proxy state for ${service}:`, err);
-        }
-      }
+      this.applyRestoredStates(this.savedProxyStates);
       this.savedProxyStates = [];
       return;
     }
@@ -162,6 +180,45 @@ export class SafariLauncher {
       } catch (err) {
         console.error(`Failed to turn off proxy for ${service}:`, err);
       }
+    }
+  }
+
+  private writeStateToFile(filePath: string): void {
+    try {
+      const payload: PersistedProxyStateFile = {
+        savedAt: new Date().toISOString(),
+        services: this.savedProxyStates,
+      };
+      writeFileSync(filePath, JSON.stringify(payload, null, 0), 'utf-8');
+    } catch (err) {
+      console.warn('[SafariLauncher] Failed to write proxy state file:', err);
+    }
+  }
+
+  /**
+   * Restore proxy state from a previously persisted file (e.g. after app crash).
+   * Call this at app startup when state file may exist. On success, the file is removed.
+   */
+  public restoreFromSavedFile(filePath: string): boolean {
+    if (process.platform !== 'darwin' || !existsSync(filePath)) return false;
+    try {
+      const raw = readFileSync(filePath, 'utf-8');
+      const data = JSON.parse(raw) as PersistedProxyStateFile;
+      if (!Array.isArray(data?.services) || data.services.length === 0) {
+        unlinkSync(filePath);
+        return true;
+      }
+      this.applyRestoredStates(data.services);
+      unlinkSync(filePath);
+      return true;
+    } catch (err) {
+      console.warn('[SafariLauncher] Failed to restore from state file:', err);
+      try {
+        unlinkSync(filePath);
+      } catch {
+        // ignore
+      }
+      return false;
     }
   }
 
@@ -271,8 +328,9 @@ export class SafariLauncher {
    * Launch Safari with proxy and optional certificate trust.
    * - proxyPort: port of the local proxy (e.g. from ServerPorts.proxyPort).
    * - options.caDir: directory where the proxy stores its CA (e.g. from getProxyCaDir()). If provided and ca.pem exists, we add it to the keychain so Safari trusts HTTPS through the proxy.
+   * - options.stateFilePath: if provided, current proxy state is written here before changing the proxy so it can be restored after a crash (see restoreFromSavedFile).
    */
-  public launch(proxyPort: number, options?: { caDir?: string | null }): LaunchResult {
+  public launch(proxyPort: number, options?: { caDir?: string | null; stateFilePath?: string | null }): LaunchResult {
     if (process.platform !== 'darwin') {
       return {
         success: false,
@@ -295,14 +353,19 @@ export class SafariLauncher {
       };
     }
 
+    if (options?.stateFilePath) {
+      this.stateFilePath = options.stateFilePath;
+      this.writeStateToFile(options.stateFilePath);
+    }
+
     const host = '127.0.0.1';
     const portStr = String(proxyPort);
     try {
       for (const { service } of this.savedProxyStates) {
-        execFileSync(NETWORKSETUP, ['-setwebproxy', service, host, portStr, 'off'], {
+        execFileSync(NETWORKSETUP, ['-setwebproxy', service, host, portStr], {
           stdio: 'ignore',
         });
-        execFileSync(NETWORKSETUP, ['-setsecurewebproxy', service, host, portStr, 'off'], {
+        execFileSync(NETWORKSETUP, ['-setsecurewebproxy', service, host, portStr], {
           stdio: 'ignore',
         });
         execFileSync(NETWORKSETUP, ['-setwebproxystate', service, 'on'], { stdio: 'ignore' });
@@ -352,6 +415,14 @@ export class SafariLauncher {
   public close(): void {
     this.restoreProxyState();
     this.removeCertFromKeychain();
+    if (this.stateFilePath && existsSync(this.stateFilePath)) {
+      try {
+        unlinkSync(this.stateFilePath);
+      } catch (err) {
+        console.warn('[SafariLauncher] Failed to remove state file:', err);
+      }
+      this.stateFilePath = null;
+    }
   }
 
   /**
