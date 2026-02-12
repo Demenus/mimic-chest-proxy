@@ -140,6 +140,7 @@ export class MimicMappingStorage {
       pattern: mapping.pattern,
       contentLength: mapping.contentLength,
       substitutionUrl: mapping.substitutionUrl,
+      followResources: mapping.followResources,
     };
   }
 

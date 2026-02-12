@@ -112,8 +112,15 @@
           placeholder="https://example.com/replacement"
           @update:model-value="(val: string | number | null) => $emit('update:substitutionUrl', val != null ? String(val) : '')"
         />
+        <q-checkbox
+          :model-value="followResources"
+          label="Follow resources"
+          class="q-mt-sm"
+          @update:model-value="(val: boolean) => $emit('update:followResources', val)"
+        />
         <div class="text-caption text-grey q-mt-sm">
           When the glob pattern matches, the proxy will fetch this URL and serve its response body instead (no redirect).
+          With "Follow resources", requests for JS, CSS, etc. under the same pattern are also served from the substitution URL base.
         </div>
       </q-card-section>
     </q-card>
@@ -134,6 +141,7 @@ export interface Props {
   language: string;
   mode: EditorMode;
   substitutionUrl: string;
+  followResources: boolean;
   isSaving?: boolean;
 }
 
@@ -143,6 +151,7 @@ const props = withDefaults(defineProps<Props>(), {
   language: 'javascript',
   mode: 'content',
   substitutionUrl: '',
+  followResources: false,
   isSaving: false,
 });
 
@@ -152,6 +161,7 @@ const emit = defineEmits<{
   'update:language': [value: string];
   'update:mode': [value: EditorMode];
   'update:substitutionUrl': [value: string];
+  'update:followResources': [value: boolean];
   change: [value: string];
   save: [];
   saveSubstitution: [];

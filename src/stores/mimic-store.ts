@@ -27,6 +27,7 @@ export interface Mapping {
   contentLength: number;
   type?: EditorMode;
   substitutionUrl?: string | null;
+  followResources?: boolean;
 }
 
 export interface MappingWithContent extends Mapping {
@@ -46,6 +47,7 @@ export const useMimicStore = defineStore('mimic', {
     editorLanguage: 'javascript',
     editorMode: 'content' as EditorMode,
     substitutionUrl: '',
+    followResources: false,
     isElectron: false,
     isLoading: false,
     isSaving: false,
@@ -94,6 +96,7 @@ export const useMimicStore = defineStore('mimic', {
         this.editorContent = response.data.content || '';
         this.editorMode = response.data.type === 'substitution' ? 'substitution' : 'content';
         this.substitutionUrl = response.data.substitutionUrl ?? '';
+        this.followResources = response.data.followResources ?? false;
 
         // Auto-detect language from content
         if (response.data.content) {
@@ -173,7 +176,7 @@ export const useMimicStore = defineStore('mimic', {
       try {
         await api.post(
           `/api/mimic/${this.selectedMappingId}`,
-          { substitutionUrl: url },
+          { substitutionUrl: url, followResources: this.followResources },
           {
             headers: {
               'Content-Type': 'application/json',
@@ -201,6 +204,7 @@ export const useMimicStore = defineStore('mimic', {
           this.editorContent = '';
           this.editorMode = 'content';
           this.substitutionUrl = '';
+          this.followResources = false;
         }
 
         // Reload mappings
@@ -227,12 +231,17 @@ export const useMimicStore = defineStore('mimic', {
       this.substitutionUrl = url;
     },
 
+    updateFollowResources(value: boolean) {
+      this.followResources = value;
+    },
+
     clearSelection() {
       this.selectedMappingId = null;
       this.selectedMapping = null;
       this.editorContent = '';
       this.editorMode = 'content';
       this.substitutionUrl = '';
+      this.followResources = false;
     },
   },
 });

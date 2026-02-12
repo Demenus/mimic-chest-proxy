@@ -57,6 +57,7 @@ export async function getMappingById(req: Request<{ id: string }>, res: Response
       content: mapping.content ? mapping.content.toString('utf-8') : '',
       type: mapping.type,
       substitutionUrl: mapping.substitutionUrl ?? undefined,
+      followResources: mapping.followResources,
     });
   } catch (error) {
     res.status(500).json({
@@ -117,7 +118,10 @@ export async function updateMappingContent(
         res.status(400).json({ error: 'substitutionUrl must be a non-empty string' });
         return;
       }
-      await mimicMappingService.updateMappingSubstitutionUrl(id, substitutionUrl);
+      const bodySub = body as { substitutionUrl: string; followResources?: unknown };
+      const followResources =
+        typeof bodySub.followResources === 'boolean' ? bodySub.followResources : undefined;
+      await mimicMappingService.updateMappingSubstitutionUrl(id, substitutionUrl, followResources);
       res.status(200).json({
         success: true,
         id,

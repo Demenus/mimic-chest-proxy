@@ -17,6 +17,7 @@
         v-model:language="editorLanguage"
         v-model:mode="editorMode"
         v-model:substitution-url="substitutionUrl"
+        v-model:follow-resources="followResources"
         :is-saving="mimicStore.isSaving"
         @select="handleSelectMapping"
         @delete="handleDeleteMapping"
@@ -58,6 +59,11 @@ const editorMode = computed({
 const substitutionUrl = computed({
   get: () => mimicStore.substitutionUrl,
   set: (value: string) => mimicStore.updateSubstitutionUrl(value),
+});
+
+const followResources = computed({
+  get: () => mimicStore.followResources,
+  set: (value: boolean) => mimicStore.updateFollowResources(value),
 });
 
 onMounted(async () => {

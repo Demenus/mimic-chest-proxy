@@ -26,6 +26,7 @@ export interface IMimicMapping {
   pattern: string | null;
   contentLength: number;
   substitutionUrl?: string | null;
+  followResources?: boolean;
 }
 
 import picomatch from 'picomatch';
@@ -40,9 +41,16 @@ export class MimicMapping implements IMimicMapping {
   private _picomatchMatcher: ((str: string) => boolean) | undefined;
   private _persistedContentLength = 0;
   private _substitutionUrl: string | null = null;
+  private _followResources = false;
   public content: Buffer | undefined;
 
-  constructor(id: string, pattern?: string | null, content?: Buffer, substitutionUrl?: string | null) {
+  constructor(
+    id: string,
+    pattern?: string | null,
+    content?: Buffer,
+    substitutionUrl?: string | null,
+    followResources?: boolean
+  ) {
     this.id = id;
     if (pattern) {
       this.setPattern(pattern);
@@ -51,6 +59,17 @@ export class MimicMapping implements IMimicMapping {
     if (substitutionUrl !== undefined && substitutionUrl !== null) {
       this._substitutionUrl = substitutionUrl.trim() || null;
     }
+    if (followResources !== undefined) {
+      this._followResources = Boolean(followResources);
+    }
+  }
+
+  get followResources(): boolean {
+    return this._followResources;
+  }
+
+  setFollowResources(value: boolean): void {
+    this._followResources = Boolean(value);
   }
 
   get type(): MimicMappingType {
@@ -127,6 +146,9 @@ export class MimicMapping implements IMimicMapping {
     if (data.substitutionUrl !== undefined && data.substitutionUrl !== null) {
       mapping._substitutionUrl = String(data.substitutionUrl).trim() || null;
     }
+    if (data.followResources !== undefined) {
+      mapping._followResources = Boolean(data.followResources);
+    }
 
     if (data.pattern) {
       try {
@@ -151,6 +173,7 @@ export class MimicMapping implements IMimicMapping {
     contentLength: number;
     type: MimicMappingType;
     substitutionUrl?: string | null;
+    followResources: boolean;
   } {
     const result: {
       id: string;
@@ -159,12 +182,14 @@ export class MimicMapping implements IMimicMapping {
       contentLength: number;
       type: MimicMappingType;
       substitutionUrl?: string | null;
+      followResources: boolean;
     } = {
       id: this.id,
       hasContent: this.hasContent,
       contentLength: this.contentLength,
       type: this.type,
       substitutionUrl: this._substitutionUrl,
+      followResources: this._followResources,
     };
 
     if (this._pattern !== null) {
@@ -182,12 +207,14 @@ export class MimicMapping implements IMimicMapping {
     pattern?: string;
     content?: Buffer;
     substitutionUrl?: string | null;
+    followResources?: boolean;
   } {
     const obj: {
       id: string;
       pattern?: string;
       content?: Buffer;
       substitutionUrl?: string | null;
+      followResources?: boolean;
     } = {
       id: this.id,
     };
@@ -203,6 +230,8 @@ export class MimicMapping implements IMimicMapping {
     if (this._substitutionUrl !== null) {
       obj.substitutionUrl = this._substitutionUrl;
     }
+
+    obj.followResources = this._followResources;
 
     return obj;
   }

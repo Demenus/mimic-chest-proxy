@@ -189,9 +189,14 @@ export class MimicMappingService {
   }
 
   /**
-   * Update the substitution URL of a mapping (sets type to 'substitution', clears stored content)
+   * Update the substitution URL of a mapping (sets type to 'substitution', clears stored content).
+   * Optionally sets followResources so resource requests are also served from the substitution base.
    */
-  async updateMappingSubstitutionUrl(id: string, substitutionUrl: string): Promise<MimicMapping> {
+  async updateMappingSubstitutionUrl(
+    id: string,
+    substitutionUrl: string,
+    followResources?: boolean
+  ): Promise<MimicMapping> {
     if (!this.storage) {
       throw new Error('Storage not initialized');
     }
@@ -202,6 +207,7 @@ export class MimicMappingService {
     }
 
     mapping.setSubstitutionUrl(substitutionUrl.trim() || null);
+    mapping.setFollowResources(followResources ?? false);
     mapping.content = undefined;
     await this.storage.set(id, mapping);
     return mapping;

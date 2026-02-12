@@ -1266,6 +1266,10 @@ export class Proxy implements IProxy {
         if (err) {
           return self._onError("ON_REQUEST_ERROR", ctx, err);
         }
+        // If the handler already sent the response (e.g. follow-resources substitution), skip forwarding
+        if (ctx.proxyToClientResponse && (ctx.proxyToClientResponse as { headersSent?: boolean }).headersSent) {
+          return;
+        }
         return self._onRequestHeaders(ctx, (err: Error | undefined | null) => {
           if (err) {
             return self._onError("ON_REQUESTHEADERS_ERROR", ctx, err);

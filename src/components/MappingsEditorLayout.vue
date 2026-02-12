@@ -48,11 +48,13 @@
           :language="language"
           :mode="mode"
           :substitution-url="substitutionUrl"
+          :follow-resources="followResources"
           :is-saving="isSaving"
           @update:content="$emit('update:content', $event)"
           @update:language="$emit('update:language', $event)"
           @update:mode="$emit('update:mode', $event)"
           @update:substitution-url="$emit('update:substitutionUrl', $event)"
+          @update:follow-resources="$emit('update:followResources', $event)"
           @change="$emit('change', $event)"
           @save="$emit('save')"
           @save-substitution="$emit('saveSubstitution')"
@@ -76,6 +78,7 @@ export interface Props {
   language: string;
   mode: EditorMode;
   substitutionUrl: string;
+  followResources: boolean;
   isSaving?: boolean;
 }
 
@@ -96,6 +99,7 @@ defineEmits<{
   'update:language': [value: string];
   'update:mode': [value: EditorMode];
   'update:substitutionUrl': [value: string];
+  'update:followResources': [value: boolean];
   change: [value: string];
   save: [];
   saveSubstitution: [];
