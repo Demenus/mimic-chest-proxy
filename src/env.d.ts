@@ -28,6 +28,7 @@ declare global {
   interface Window {
     electronAPI?: {
       launchMimicChrome: () => Promise<{ success: boolean; error?: string }>;
+      launchMimicSafari: () => Promise<{ success: boolean; error?: string }>;
       getMimicServerPort: () => Promise<number | null>;
     };
   }

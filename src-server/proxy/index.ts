@@ -48,3 +48,12 @@ export function stopProxyServer(): void {
 export function isProxyServerRunning(): boolean {
   return proxyServerInstance?.isRunning() ?? false;
 }
+
+/**
+ * Get the proxy CA directory path (where http-mitm-proxy stores/generates CA certs).
+ * Used by Safari launcher to add the CA to the keychain so Safari trusts the proxy.
+ * Returns null if the proxy has not been started.
+ */
+export function getProxyCaDir(): string | null {
+  return proxyServerInstance?.getCaDir() ?? null;
+}

@@ -19,8 +19,9 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import { startServers, type ServerPorts } from '../src-server/index.js';
+import { startServers, getProxyCaDir, type ServerPorts } from '../src-server/index.js';
 import { ChromeLauncher } from './ChromeLauncher.js';
+import { SafariLauncher } from './SafariLauncher.js';
 
 // needed in case process is undefined under Linux
 const platform = process.platform || os.platform();
@@ -30,6 +31,7 @@ const currentDir = fileURLToPath(new URL('.', import.meta.url));
 let mainWindow: BrowserWindow | undefined;
 let serverPorts: ServerPorts | null = null;
 const chromeLauncher = new ChromeLauncher();
+const safariLauncher = new SafariLauncher();
 
 async function createWindow() {
   /**
@@ -79,6 +81,17 @@ ipcMain.handle('launch-mimic-chrome', () => {
   return chromeLauncher.launch(serverPorts.proxyPort);
 });
 
+ipcMain.handle('launch-mimic-safari', () => {
+  if (!serverPorts) {
+    return {
+      success: false,
+      error: 'Servers are not running',
+    };
+  }
+  const caDir = getProxyCaDir();
+  return safariLauncher.launch(serverPorts.proxyPort, { caDir: caDir ?? null });
+});
+
 ipcMain.handle('get-mimic-server-port', () => {
   return serverPorts?.mimicPort ?? null;
 });
@@ -95,9 +108,10 @@ void app.whenReady().then(async () => {
   console.log(`Proxy server started on port ${serverPorts.proxyPort}`);
 });
 
-// Cleanup Chrome process on app quit
+// Cleanup browser launchers on app quit (restore Safari proxy state, kill Chrome)
 app.on('before-quit', () => {
   chromeLauncher.close();
+  safariLauncher.close();
 });
 
 app.on('window-all-closed', () => {

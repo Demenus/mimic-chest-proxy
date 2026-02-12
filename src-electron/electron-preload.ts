@@ -27,5 +27,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   launchMimicChrome: () => ipcRenderer.invoke('launch-mimic-chrome'),
+  launchMimicSafari: () => ipcRenderer.invoke('launch-mimic-safari'),
   getMimicServerPort: () => ipcRenderer.invoke('get-mimic-server-port'),
 });
