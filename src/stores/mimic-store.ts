@@ -21,7 +21,6 @@ import { api, configureMimicApi } from 'boot/axios';
 export interface Mapping {
   id: string;
   pattern?: string;
-  regexPattern?: string;
   hasContent: boolean;
   contentLength: number;
 }
@@ -31,8 +30,7 @@ export interface MappingWithContent extends Mapping {
 }
 
 interface CreateMappingPayload {
-  pattern?: string;
-  regexPattern?: string;
+  pattern: string;
 }
 
 export const useMimicStore = defineStore('mimic', {
@@ -51,7 +49,7 @@ export const useMimicStore = defineStore('mimic', {
   getters: {
     selectedMappingUrl: (state) => {
       if (!state.selectedMapping) return '';
-      return state.selectedMapping.pattern || state.selectedMapping.regexPattern || '';
+      return state.selectedMapping.pattern || '';
     },
   },
 

@@ -27,7 +27,7 @@ interface StorageIndex {
  * Storage layer for MimicMapping data
  * Handles in-memory state and persistence to filesystem:
  * - In-memory Map for fast access
- * - index.json: Contains metadata (id, url, regexPattern)
+ * - index.json: Contains metadata (id, pattern, contentLength)
  * - {id}.txt: Contains content for each mapping (UTF-8 text)
  */
 export class MimicMappingStorage {
@@ -47,9 +47,10 @@ export class MimicMappingStorage {
     // Ensure storage directory exists
     await fs.mkdir(this.storageDir, { recursive: true });
 
-    // Load existing mappings from disk into memory
+    // Load existing mappings from disk into memory (only those with pattern)
     const metadataList = await this.loadIndex();
     for (const metadata of metadataList) {
+      if (!metadata.pattern) continue;
       const mapping = this.interfaceToMapping(metadata);
       this.mimicMappings.set(metadata.id, mapping);
     }
@@ -137,7 +138,6 @@ export class MimicMappingStorage {
     return {
       id: mapping.id,
       pattern: mapping.pattern,
-      regexPattern: mapping.regexPattern,
       contentLength: mapping.contentLength,
     };
   }
@@ -176,37 +176,14 @@ export class MimicMappingStorage {
   }
 
   /**
-   * Find a mapping by exact regex pattern match
-   */
-  findByRegex(regexPattern: string): { id: string; mapping: MimicMapping } | undefined {
-    for (const [id, mapping] of this.mimicMappings.entries()) {
-      if (mapping.regexPattern === regexPattern) {
-        return { id, mapping };
-      }
-    }
-    return undefined;
-  }
-
-  /**
-   * Find a matching mapping by URL
-   * First checks for glob patterns, then checks regex patterns
-   * This ensures that glob patterns are checked before regex patterns
+   * Find a matching mapping by URL using glob patterns
    */
   findMatchingMapping(url: string): MimicMapping | undefined {
-    // First pass: check all glob patterns
     for (const mapping of this.mimicMappings.values()) {
       if (mapping.pattern !== null && mapping.matches(url)) {
         return mapping;
       }
     }
-
-    // Second pass: check regex patterns (only if no glob pattern match was found)
-    for (const mapping of this.mimicMappings.values()) {
-      if (mapping.pattern === null && mapping.regexPattern !== null && mapping.matches(url)) {
-        return mapping;
-      }
-    }
-
     return undefined;
   }
 

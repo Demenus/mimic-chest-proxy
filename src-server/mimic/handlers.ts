@@ -50,7 +50,6 @@ export async function getMappingById(req: Request<{ id: string }>, res: Response
     res.status(200).json({
       id: mapping.id,
       pattern: mapping.pattern,
-      regexPattern: mapping.regexPattern,
       content: mapping.content ? mapping.content.toString('utf-8') : '',
     });
   } catch (error) {
@@ -66,23 +65,16 @@ export async function createMapping(
   res: Response
 ): Promise<void> {
   try {
-    const { pattern, regexPattern } = req.body;
+    const { pattern } = req.body;
 
-    if (!pattern && !regexPattern) {
-      res.status(400).json({ error: 'Either pattern or regexPattern must be provided' });
+    if (!pattern || typeof pattern !== 'string' || !pattern.trim()) {
+      res.status(400).json({ error: 'pattern is required' });
       return;
     }
 
-    const mapping = await mimicMappingService.createMapping(pattern, regexPattern);
+    const mapping = await mimicMappingService.createMapping(pattern.trim());
 
-    const response: CreateMappingResponse = { id: mapping.id };
-    if (pattern) {
-      response.pattern = pattern;
-    } else if (regexPattern) {
-      response.regexPattern = regexPattern;
-    }
-
-    res.status(201).json(response);
+    res.status(201).json({ id: mapping.id, pattern: mapping.pattern ?? undefined });
   } catch (error) {
     res.status(400).json({
       error: 'Failed to create mapping',

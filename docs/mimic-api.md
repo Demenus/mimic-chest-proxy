@@ -7,9 +7,9 @@ The Mimic API is an Express server that provides REST endpoints to manage URL→
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check. Returns `{ "status": "ok" }`. |
-| GET | `/api/mimic` | List all mappings (metadata only: id, pattern/regexPattern, hasContent, contentLength). |
-| GET | `/api/mimic/:id` | Get one mapping by id, including content (as UTF-8 text). |
-| POST | `/api/mimic/url` | Create a mapping. Body: `{ "pattern"?: string, "regexPattern"?: string }`. Returns `{ "id", "pattern"? \| "regexPattern"? }`. |
+| GET | `/api/mimic` | List all mappings (metadata only: id, pattern, hasContent, contentLength). |
+| GET | `/api/mimic/:id` | Get one mapping by id, including content (as UTF-8 text). Returns 404 if content not found. |
+| POST | `/api/mimic/url` | Create a mapping. Body: `{ "pattern": string }`. Returns `{ "id", "pattern"? }`. |
 | POST | `/api/mimic/:id` | Set or update the replacement content for a mapping. Body: plain text (e.g. HTML, JS). Returns `{ "success", "id", "contentLength" }`. |
 | DELETE | `/api/mimic/:id` | Delete a mapping. Returns `{ "success", "id" }`. |
 
@@ -38,5 +38,5 @@ flowchart LR
 
 ## Content types
 
-- Create mapping: `POST /api/mimic/url` with JSON body `{ "pattern" }` or `{ "regexPattern" }`.
+- Create mapping: `POST /api/mimic/url` with JSON body `{ "pattern": string }`.
 - Set content: `POST /api/mimic/:id` with body as **plain text** (e.g. `Content-Type: text/plain` or JSON string). The server accepts both JSON and text bodies and treats the payload as the replacement content (HTML, JavaScript, etc.).
