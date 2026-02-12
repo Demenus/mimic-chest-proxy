@@ -139,6 +139,8 @@ export class MimicMappingStorage {
       id: mapping.id,
       pattern: mapping.pattern,
       contentLength: mapping.contentLength,
+      substitutionUrl: mapping.substitutionUrl,
+      followResources: mapping.followResources,
     };
   }
 
@@ -209,9 +211,10 @@ export class MimicMappingStorage {
     this.mimicMappings.set(id, mapping);
     await this.persistIndex();
 
-    // Save content if it exists
-    if (mapping.content) {
+    if (mapping.content && mapping.content.length > 0) {
       await this.saveContent(id, mapping.content);
+    } else {
+      await this.deleteContent(id);
     }
   }
 

@@ -18,11 +18,16 @@
 import { defineStore, acceptHMRUpdate } from 'pinia';
 import { api, configureMimicApi } from 'boot/axios';
 
+export type EditorMode = 'content' | 'substitution';
+
 export interface Mapping {
   id: string;
   pattern?: string;
   hasContent: boolean;
   contentLength: number;
+  type?: EditorMode;
+  substitutionUrl?: string | null;
+  followResources?: boolean;
 }
 
 export interface MappingWithContent extends Mapping {
@@ -40,6 +45,9 @@ export const useMimicStore = defineStore('mimic', {
     selectedMapping: null as MappingWithContent | null,
     editorContent: '',
     editorLanguage: 'javascript',
+    editorMode: 'content' as EditorMode,
+    substitutionUrl: '',
+    followResources: false,
     isElectron: false,
     isLoading: false,
     isSaving: false,
@@ -86,6 +94,9 @@ export const useMimicStore = defineStore('mimic', {
         const response = await api.get<MappingWithContent>(`/api/mimic/${id}`);
         this.selectedMapping = response.data;
         this.editorContent = response.data.content || '';
+        this.editorMode = response.data.type === 'substitution' ? 'substitution' : 'content';
+        this.substitutionUrl = response.data.substitutionUrl ?? '';
+        this.followResources = response.data.followResources ?? false;
 
         // Auto-detect language from content
         if (response.data.content) {
@@ -141,10 +152,42 @@ export const useMimicStore = defineStore('mimic', {
           },
         });
 
-        // Reload mappings to update the hasContent flag
         await this.loadMappings();
       } catch (error) {
         console.error('Failed to save content:', error);
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+
+    async saveSubstitutionUrl() {
+      if (!this.selectedMappingId) {
+        throw new Error('No mapping selected');
+      }
+
+      const url = this.substitutionUrl.trim();
+      if (!url) {
+        throw new Error('Substitution URL is required');
+      }
+
+      this.isSaving = true;
+
+      try {
+        await api.post(
+          `/api/mimic/${this.selectedMappingId}`,
+          { substitutionUrl: url, followResources: this.followResources },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        this.editorMode = 'substitution';
+        await this.loadMappings();
+      } catch (error) {
+        console.error('Failed to save substitution URL:', error);
         throw error;
       } finally {
         this.isSaving = false;
@@ -155,11 +198,13 @@ export const useMimicStore = defineStore('mimic', {
       try {
         await api.delete(`/api/mimic/${id}`);
 
-        // If the deleted mapping was selected, clear the selection
         if (this.selectedMappingId === id) {
           this.selectedMappingId = null;
           this.selectedMapping = null;
           this.editorContent = '';
+          this.editorMode = 'content';
+          this.substitutionUrl = '';
+          this.followResources = false;
         }
 
         // Reload mappings
@@ -178,10 +223,25 @@ export const useMimicStore = defineStore('mimic', {
       this.editorLanguage = language;
     },
 
+    updateEditorMode(mode: EditorMode) {
+      this.editorMode = mode;
+    },
+
+    updateSubstitutionUrl(url: string) {
+      this.substitutionUrl = url;
+    },
+
+    updateFollowResources(value: boolean) {
+      this.followResources = value;
+    },
+
     clearSelection() {
       this.selectedMappingId = null;
       this.selectedMapping = null;
       this.editorContent = '';
+      this.editorMode = 'content';
+      this.substitutionUrl = '';
+      this.followResources = false;
     },
   },
 });

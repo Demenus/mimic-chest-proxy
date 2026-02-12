@@ -22,6 +22,7 @@ import {
   createMapping,
   updateMappingContent,
   deleteMapping,
+  fetchUrlContent,
 } from './handlers.js';
 
 /**
@@ -45,6 +46,7 @@ export function setupRoutes(app: Express): void {
   });
 
   app.get('/api/mimic', getMappings);
+  app.post('/api/mimic/fetch-url', asyncHandler(fetchUrlContent));
   app.get('/api/mimic/:id', asyncHandler(getMappingById));
   app.post('/api/mimic/url', asyncHandler(createMapping));
   app.post('/api/mimic/:id', asyncHandler(updateMappingContent));

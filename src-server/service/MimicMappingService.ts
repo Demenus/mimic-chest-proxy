@@ -96,9 +96,10 @@ export class MimicMappingService {
 
   /**
    * Ensure mapping has content loaded from storage if not already in memory.
+   * Skips loading for substitution-type mappings (they use substitutionUrl instead).
    */
   private async ensureContentLoaded(mapping: MimicMapping): Promise<void> {
-    if (mapping.content) {
+    if (mapping.content || mapping.substitutionUrl) {
       return;
     }
     try {
@@ -169,7 +170,7 @@ export class MimicMappingService {
   }
 
   /**
-   * Update the content of a mapping
+   * Update the content of a mapping (sets type to 'content', clears substitutionUrl)
    */
   async updateMappingContent(id: string, content: Buffer): Promise<MimicMapping> {
     if (!this.storage) {
@@ -182,6 +183,32 @@ export class MimicMappingService {
     }
 
     mapping.content = content;
+    mapping.setSubstitutionUrl(null);
+    await this.storage.set(id, mapping);
+    return mapping;
+  }
+
+  /**
+   * Update the substitution URL of a mapping (sets type to 'substitution', clears stored content).
+   * Optionally sets followResources so resource requests are also served from the substitution base.
+   */
+  async updateMappingSubstitutionUrl(
+    id: string,
+    substitutionUrl: string,
+    followResources?: boolean
+  ): Promise<MimicMapping> {
+    if (!this.storage) {
+      throw new Error('Storage not initialized');
+    }
+
+    const mapping = this.storage.get(id);
+    if (!mapping) {
+      throw new Error('Mapping not found');
+    }
+
+    mapping.setSubstitutionUrl(substitutionUrl.trim() || null);
+    mapping.setFollowResources(followResources ?? false);
+    mapping.content = undefined;
     await this.storage.set(id, mapping);
     return mapping;
   }

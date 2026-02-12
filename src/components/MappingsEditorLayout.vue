@@ -46,11 +46,18 @@
           :url="normalizedSelectedUrl"
           :content="content"
           :language="language"
+          :mode="mode"
+          :substitution-url="substitutionUrl"
+          :follow-resources="followResources"
           :is-saving="isSaving"
           @update:content="$emit('update:content', $event)"
           @update:language="$emit('update:language', $event)"
+          @update:mode="$emit('update:mode', $event)"
+          @update:substitution-url="$emit('update:substitutionUrl', $event)"
+          @update:follow-resources="$emit('update:followResources', $event)"
           @change="$emit('change', $event)"
           @save="$emit('save')"
+          @save-substitution="$emit('saveSubstitution')"
         />
       </div>
     </template>
@@ -61,6 +68,7 @@
 import { computed } from 'vue';
 import MappingsList, { type Mapping } from 'components/MappingsList.vue';
 import ContentEditorSection from 'components/ContentEditorSection.vue';
+import type { EditorMode } from 'stores/mimic-store';
 
 export interface Props {
   mappings: Mapping[];
@@ -68,17 +76,18 @@ export interface Props {
   selectedUrl?: string;
   content: string;
   language: string;
+  mode: EditorMode;
+  substitutionUrl: string;
+  followResources: boolean;
   isSaving?: boolean;
 }
 
 const props = defineProps<Props>();
 
-// Normalize selectedId to match MappingsList expected type (string | null, not undefined)
 const normalizedSelectedId = computed<string | null>(() => {
   return props.selectedId ?? null;
 });
 
-// Normalize selectedUrl to match ContentEditorSection expected type (string, not undefined)
 const normalizedSelectedUrl = computed<string>(() => {
   return props.selectedUrl ?? '';
 });
@@ -88,8 +97,12 @@ defineEmits<{
   delete: [id: string];
   'update:content': [value: string];
   'update:language': [value: string];
+  'update:mode': [value: EditorMode];
+  'update:substitutionUrl': [value: string];
+  'update:followResources': [value: boolean];
   change: [value: string];
   save: [];
+  saveSubstitution: [];
 }>();
 </script>
 

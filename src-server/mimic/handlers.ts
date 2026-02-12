@@ -23,7 +23,11 @@ import type {
   CreateMappingResponse,
   UpdateContentResponse,
   ErrorResponse,
+  FetchUrlRequest,
+  FetchUrlResponse,
 } from '../types.js';
+
+const FETCH_URL_TIMEOUT_MS = 15_000;
 
 export function getMappings(_req: Request, res: Response): void {
   try {
@@ -51,6 +55,9 @@ export async function getMappingById(req: Request<{ id: string }>, res: Response
       id: mapping.id,
       pattern: mapping.pattern,
       content: mapping.content ? mapping.content.toString('utf-8') : '',
+      type: mapping.type,
+      substitutionUrl: mapping.substitutionUrl ?? undefined,
+      followResources: mapping.followResources,
     });
   } catch (error) {
     res.status(500).json({
@@ -96,6 +103,34 @@ export async function updateMappingContent(
       return;
     }
 
+    // JSON body with substitutionUrl → set substitution URL (type = 'substitution')
+    const isJson = req.is('application/json');
+    const body = req.body as unknown;
+    if (
+      isJson &&
+      body &&
+      typeof body === 'object' &&
+      'substitutionUrl' in body &&
+      typeof (body as { substitutionUrl: unknown }).substitutionUrl === 'string'
+    ) {
+      const substitutionUrl = (body as { substitutionUrl: string }).substitutionUrl.trim();
+      if (!substitutionUrl) {
+        res.status(400).json({ error: 'substitutionUrl must be a non-empty string' });
+        return;
+      }
+      const bodySub = body as { substitutionUrl: string; followResources?: unknown };
+      const followResources =
+        typeof bodySub.followResources === 'boolean' ? bodySub.followResources : undefined;
+      await mimicMappingService.updateMappingSubstitutionUrl(id, substitutionUrl, followResources);
+      res.status(200).json({
+        success: true,
+        id,
+        contentLength: 0,
+      });
+      return;
+    }
+
+    // Plain text or other body → set content (type = 'content')
     const content = parseContentFromBody(req.body);
     await mimicMappingService.updateMappingContent(id, content);
 
@@ -113,6 +148,56 @@ export async function updateMappingContent(
       error: 'Failed to update content',
       details: error instanceof Error ? error.message : String(error),
     });
+  }
+}
+
+export async function fetchUrlContent(
+  req: Request<unknown, FetchUrlResponse | ErrorResponse, FetchUrlRequest>,
+  res: Response
+): Promise<void> {
+  try {
+    const { url } = req.body;
+
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      res.status(400).json({ error: 'url is required' });
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_URL_TIMEOUT_MS);
+
+    const response = await fetch(url.trim(), {
+      signal: controller.signal,
+      headers: { Accept: '*/*' },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      res.status(response.status).json({
+        error: `Fetch failed: ${response.status} ${response.statusText}`,
+        details: `Request to ${url.trim()} returned ${response.status}`,
+      });
+      return;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const content = buffer.toString('utf-8');
+
+    res.status(200).json({ content });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        res.status(408).json({ error: 'Request timeout', details: 'Fetch exceeded timeout' });
+        return;
+      }
+      res.status(502).json({
+        error: 'Failed to fetch URL',
+        details: error.message,
+      });
+      return;
+    }
+    res.status(502).json({ error: 'Failed to fetch URL', details: String(error) });
   }
 }
 

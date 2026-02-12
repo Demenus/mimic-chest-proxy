@@ -32,6 +32,54 @@ interface ResponseLike {
 }
 
 /**
+ * Sends a buffer as the response body (used when content comes from substitution URL fetch).
+ */
+export function sendMimickedContentWithBuffer(
+  res: ServerResponse | ResponseLike,
+  contentBuffer: Buffer,
+  targetUrl: string,
+  mappingId: string,
+  statusCode?: number,
+  originalHeaders?: Record<string, string | string[] | undefined>
+): void {
+  const contentType = detectContentType(contentBuffer);
+
+  const headers: Record<string, string> = {};
+  if (originalHeaders) {
+    for (const [key, value] of Object.entries(originalHeaders)) {
+      if (value !== undefined) {
+        const lowerKey = key.toLowerCase();
+        if (
+          lowerKey !== 'content-length' &&
+          lowerKey !== 'content-encoding' &&
+          lowerKey !== 'transfer-encoding'
+        ) {
+          headers[key] = Array.isArray(value) ? value.join(', ') : String(value);
+        }
+      }
+    }
+  }
+  headers['Content-Type'] = contentType;
+  headers['Content-Length'] = contentBuffer.length.toString();
+  const finalStatusCode = statusCode || 200;
+
+  logger.info('Sending mimicked content to client (from substitution URL)', {
+    url: targetUrl,
+    contentType,
+    contentLength: contentBuffer.length,
+    mappingId,
+  });
+
+  if (!res.headersSent) {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore - writeHead overload differences between ServerResponse and Proxy response
+    res.writeHead(finalStatusCode, headers);
+  }
+  res.write(contentBuffer);
+  res.end();
+}
+
+/**
  * Handle response with mimicked content
  * Works with both Express ServerResponse and http-mitm-proxy context
  * Following simple-proxy.js pattern: clean headers and check headersSent
