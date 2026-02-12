@@ -15,9 +15,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createRequire } from 'module';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { Proxy } from 'http-mitm-proxy';
 import { logger } from '../logger.js';
 import { mimicMappingService } from '../service/MimicMappingService.js';
 import { RequestHandler } from './RequestHandler.js';
@@ -27,11 +27,9 @@ import type { MitmProxyContext, MitmProxyInstance } from './types.js';
 // Silence console logs from http-mitm-proxy (including Socket/parse errors from non-HTTP traffic)
 silencePackageLogs('http-mitm-proxy', { silenceError: true });
 
-const require = createRequire(import.meta.url);
-const Proxy = require('http-mitm-proxy').Proxy;
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '../..');
 
 /**
  * Proxy server class that handles HTTP proxy requests using http-mitm-proxy
@@ -44,7 +42,6 @@ export class ProxyServer {
 
   constructor() {
     this.requestHandler = new RequestHandler(mimicMappingService);
-    const projectRoot = join(__dirname, '../../..');
     const certDir = join(projectRoot, 'certs');
     this.caDir = join(certDir, 'ca');
   }

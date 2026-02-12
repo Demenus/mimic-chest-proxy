@@ -1,7 +1,11 @@
 // Configuration for your app
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from '#q-app/wrappers';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig((/* ctx */) => {
   return {
@@ -174,7 +178,24 @@ export default defineConfig((/* ctx */) => {
 
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/developing-electron-apps/configuring-electron
     electron: {
-      // extendElectronMainConf (esbuildConf) {},
+      extendElectronMainConf(esbuildConf) {
+        const aliasPlugin = {
+          name: 'alias-http-mitm-proxy',
+          setup(build: import('esbuild').PluginBuild) {
+            build.onResolve({ filter: /^http-mitm-proxy$/ }, () => ({
+              path: path.resolve(__dirname, 'http-mitm-proxy/index.ts'),
+            }));
+          },
+        };
+        esbuildConf.plugins = [...(esbuildConf.plugins || []), aliasPlugin];
+        // Externalize Node built-ins so they are not bundled (avoids "Dynamic require of 'http' is not supported" in ESM bundle)
+        const nodeBuiltins = [
+          'http', 'https', 'net', 'fs', 'path', 'url', 'tls', 'crypto', 'stream', 'zlib',
+          'os', 'assert', 'buffer', 'child_process', 'cluster', 'dgram', 'dns', 'events',
+          'punycode', 'querystring', 'readline', 'string_decoder', 'timers', 'tty', 'util', 'v8', 'vm',
+        ];
+        esbuildConf.external = [...new Set([...(esbuildConf.external || []), ...nodeBuiltins])];
+      },
       // extendElectronPreloadConf (esbuildConf) {},
 
       // extendPackageJson (json) {},
