@@ -29,6 +29,8 @@ declare global {
     electronAPI?: {
       launchMimicChrome: () => Promise<{ success: boolean; error?: string }>;
       launchMimicSafari: () => Promise<{ success: boolean; error?: string }>;
+      restoreSystemProxy: () => Promise<{ success: boolean }>;
+      isSafariProxyActive: () => Promise<boolean>;
       getMimicServerPort: () => Promise<number | null>;
     };
   }

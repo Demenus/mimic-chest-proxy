@@ -49,12 +49,34 @@ export class MimicMappingService {
   }
 
   /**
+   * Normalize a bare host/domain (e.g. "google.com") into a glob that matches any URL containing it.
+   * So "google.com" becomes "**google.com**" and will match "https://www.google.com/".
+   */
+  private normalizeGlobPattern(pattern: string): string {
+    const trimmed = pattern.trim();
+    if (!trimmed) {
+      return trimmed;
+    }
+    const hasWildcards = /\*|\?/.test(trimmed);
+    const hasProtocol = /^https?:\/\//i.test(trimmed);
+    if (hasWildcards || hasProtocol) {
+      return trimmed;
+    }
+    return `**${trimmed}**`;
+  }
+
+  /**
    * Create a new mapping for a glob pattern or regex pattern
-   * If a mapping with the same pattern or regexPattern already exists, it will be overwritten
+   * If a mapping with the same pattern or regexPattern already exists, it will be overwritten.
+   * Bare host names (e.g. "google.com") are normalized to a glob that matches any URL containing them.
    */
   async createMapping(pattern?: string, regexPattern?: string): Promise<MimicMapping> {
     if (!this.storage) {
       throw new Error('Storage not initialized');
+    }
+
+    if (pattern) {
+      pattern = this.normalizeGlobPattern(pattern);
     }
 
     // Check if a mapping with the same pattern or regexPattern already exists
@@ -93,6 +115,24 @@ export class MimicMappingService {
   }
 
   /**
+   * Ensure mapping has content loaded from storage if not already in memory.
+   */
+  private async ensureContentLoaded(mapping: MimicMapping): Promise<void> {
+    if (mapping.content) {
+      return;
+    }
+    try {
+      const content = await this.storage!.loadContent(mapping.id);
+      if (content) {
+        mapping.content = content;
+        await this.storage!.set(mapping.id, mapping);
+      }
+    } catch (error) {
+      console.error(`Failed to load content for mapping ${mapping.id}:`, error);
+    }
+  }
+
+  /**
    * Get a mapping by ID
    * Loads content from storage if not already in memory
    */
@@ -106,20 +146,7 @@ export class MimicMappingService {
       return undefined;
     }
 
-    // Load content from storage if not in memory
-    if (!mapping.content) {
-      try {
-        const content = await this.storage.loadContent(id);
-        if (content) {
-          mapping.content = content;
-          // Update the mapping in storage with loaded content
-          await this.storage.set(id, mapping);
-        }
-      } catch (error) {
-        console.error(`Failed to load content for mapping ${id}:`, error);
-      }
-    }
-
+    await this.ensureContentLoaded(mapping);
     return mapping;
   }
 
@@ -159,20 +186,7 @@ export class MimicMappingService {
       return undefined;
     }
 
-    // Load content if not already in memory
-    if (!mapping.content) {
-      try {
-        const content = await this.storage.loadContent(mapping.id);
-        if (content) {
-          mapping.content = content;
-          // Update the mapping in storage with loaded content
-          await this.storage.set(mapping.id, mapping);
-        }
-      } catch (error) {
-        console.error(`Failed to load content for mapping ${mapping.id}:`, error);
-      }
-    }
-
+    await this.ensureContentLoaded(mapping);
     return mapping;
   }
 

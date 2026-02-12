@@ -15,164 +15,38 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import type { Express, Request, Response } from 'express';
-import { mimicMappingService } from '../service/MimicMappingService.js';
-import { parseContentFromBody } from '../utils/index.js';
-import type {
-  CreateMappingRequest,
-  CreateMappingResponse,
-  UpdateContentResponse,
-  ErrorResponse,
-} from '../types.js';
+import type { Express, Request, Response, NextFunction } from 'express';
+import {
+  getMappings,
+  getMappingById,
+  createMapping,
+  updateMappingContent,
+  deleteMapping,
+} from './handlers.js';
+
+/**
+ * Wraps an async route handler so Express receives a void-returning function.
+ * Rejected promises are forwarded to next().
+ */
+function asyncHandler<Req extends Request = Request>(
+  handler: (req: Req, res: Response) => Promise<void>
+): (req: Req, res: Response, next: NextFunction) => void {
+  return (req: Req, res: Response, next: NextFunction) => {
+    void handler(req, res).catch(next);
+  };
+}
 
 /**
  * Setup all API routes
  */
 export function setupRoutes(app: Express): void {
-  // Health check endpoint
-  app.get('/health', (req: Request, res: Response) => {
+  app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
   });
 
-  // GET /api/mimic - Get all mappings
-  app.get(
-    '/api/mimic',
-    (req: Request, res: Response) => {
-      try {
-        const mappings = mimicMappingService.getAllMappingsWithMetadata();
-        res.status(200).json(mappings);
-      } catch (error) {
-        res.status(500).json({
-          error: 'Failed to get mappings',
-          details: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  );
-
-  // GET /api/mimic/:id - Get a specific mapping with content
-  app.get(
-    '/api/mimic/:id',
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    async (req: Request<{ id: string }>, res: Response) => {
-      try {
-        const { id } = req.params;
-        const mapping = await mimicMappingService.getMapping(id);
-
-        if (!mapping) {
-          res.status(404).json({ error: 'Mapping not found' });
-          return;
-        }
-
-        res.status(200).json({
-          id: mapping.id,
-          pattern: mapping.pattern,
-          regexPattern: mapping.regexPattern,
-          content: mapping.content ? mapping.content.toString('utf-8') : '',
-        });
-      } catch (error) {
-        res.status(500).json({
-          error: 'Failed to get mapping',
-          details: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  );
-
-  // POST /api/mimic/url - Register glob pattern or regex pattern
-  app.post(
-    '/api/mimic/url',
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    async (req: Request<unknown, CreateMappingResponse | ErrorResponse, CreateMappingRequest>, res: Response) => {
-      try {
-        const { pattern, regexPattern } = req.body;
-
-        if (!pattern && !regexPattern) {
-          res.status(400).json({ error: 'Either pattern or regexPattern must be provided' });
-          return;
-        }
-
-        const mapping = await mimicMappingService.createMapping(pattern, regexPattern);
-
-        const response: CreateMappingResponse = { id: mapping.id };
-        if (pattern) {
-          response.pattern = pattern;
-        } else if (regexPattern) {
-          response.regexPattern = regexPattern;
-        }
-
-        res.status(201).json(response);
-      } catch (error) {
-        res.status(400).json({
-          error: 'Failed to create mapping',
-          details: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  );
-
-  // POST /api/mimic/:id - Assign content to a mapping (expects text content)
-  app.post(
-    '/api/mimic/:id',
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    async (req: Request<{ id: string }, UpdateContentResponse | ErrorResponse>, res: Response) => {
-      try {
-        const { id } = req.params;
-        const mapping = await mimicMappingService.getMapping(id);
-
-        if (!mapping) {
-          res.status(404).json({ error: 'Mapping not found' });
-          return;
-        }
-
-        // Content is expected as plain text (js, json, html, etc.)
-        const content = parseContentFromBody(req.body);
-
-        await mimicMappingService.updateMappingContent(id, content);
-
-        res.status(200).json({
-          success: true,
-          id,
-          contentLength: content.length,
-        });
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Mapping not found') {
-          res.status(404).json({ error: error.message });
-          return;
-        }
-        res.status(400).json({
-          error: 'Failed to update content',
-          details: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  );
-
-  // DELETE /api/mimic/:id - Delete a mapping
-  app.delete(
-    '/api/mimic/:id',
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    async (req: Request<{ id: string }>, res: Response) => {
-      try {
-        const { id } = req.params;
-        const deleted = await mimicMappingService.deleteMapping(id);
-
-        if (!deleted) {
-          res.status(404).json({ error: 'Mapping not found' });
-          return;
-        }
-
-        res.status(200).json({
-          success: true,
-          id,
-        });
-      } catch (error) {
-        res.status(500).json({
-          error: 'Failed to delete mapping',
-          details: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  );
+  app.get('/api/mimic', getMappings);
+  app.get('/api/mimic/:id', asyncHandler(getMappingById));
+  app.post('/api/mimic/url', asyncHandler(createMapping));
+  app.post('/api/mimic/:id', asyncHandler(updateMappingContent));
+  app.delete('/api/mimic/:id', asyncHandler(deleteMapping));
 }
-

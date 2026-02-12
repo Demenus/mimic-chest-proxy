@@ -28,5 +28,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('electronAPI', {
   launchMimicChrome: () => ipcRenderer.invoke('launch-mimic-chrome'),
   launchMimicSafari: () => ipcRenderer.invoke('launch-mimic-safari'),
+  restoreSystemProxy: () => ipcRenderer.invoke('restore-system-proxy'),
+  isSafariProxyActive: () => ipcRenderer.invoke('is-safari-proxy-active'),
   getMimicServerPort: () => ipcRenderer.invoke('get-mimic-server-port'),
 });

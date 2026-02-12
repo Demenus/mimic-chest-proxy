@@ -75,8 +75,8 @@ export function sendMimickedContent(
 
   const finalStatusCode = statusCode || 200;
 
-  logger.info('Returning mimicked content', {
-    targetUrl,
+  logger.info('Sending mimicked content to client', {
+    url: targetUrl,
     contentType,
     contentLength: contentBuffer.length,
     mappingId: mapping.id,

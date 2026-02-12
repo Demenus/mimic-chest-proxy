@@ -92,6 +92,15 @@ ipcMain.handle('launch-mimic-safari', () => {
   return safariLauncher.launch(serverPorts.proxyPort, { caDir: caDir ?? null });
 });
 
+ipcMain.handle('restore-system-proxy', () => {
+  safariLauncher.close();
+  return { success: true };
+});
+
+ipcMain.handle('is-safari-proxy-active', () => {
+  return safariLauncher.isRunning();
+});
+
 ipcMain.handle('get-mimic-server-port', () => {
   return serverPorts?.mimicPort ?? null;
 });

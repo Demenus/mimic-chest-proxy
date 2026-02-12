@@ -2,6 +2,19 @@
 
 An easy reverse proxy to be used graphically
 
+## Safari and HTTPS
+
+When you open Safari with the proxy (via "Open Safari" in the app), Safari may show a **"Connection not private"** or certificate warning for HTTPS sites. For now you need to **accept it in Safari** (e.g. "Show details" → "visit this website") so the proxy can intercept HTTPS. Chrome is launched with flags that skip this; Safari uses the system proxy and requires this one-time acceptance (or manually trusting the `NodeMITMProxyCA` certificate in Keychain Access).
+
+## System proxy and other browsers (macOS)
+
+"Open Safari" sets the **system** HTTP/HTTPS proxy (for all network interfaces). So **all** browsers and apps that use the system proxy will send traffic through Mimic Chest while that proxy is active. The proxy is restored when you **quit the app** (or when you click **"Restore proxy"** in the navbar).
+
+If you closed the app without quitting (e.g. force quit, crash) and **other browsers can't access the internet**, either:
+
+- Open Mimic Chest again and click **"Restore proxy"** in the top bar, or  
+- On macOS: **System Settings → Network → [your connection] → Details → Proxies** and turn off **Web Proxy (HTTP)** and **Secure Web Proxy (HTTPS)**.
+
 ## License
 
 Copyright (c) 2025 Aarón Negrín

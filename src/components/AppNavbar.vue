@@ -40,6 +40,15 @@
         @click="handleLaunchSafari"
         class="launch-button"
       />
+      <q-btn
+        v-if="isElectron"
+        flat
+        dense
+        label="Restore proxy"
+        icon="link_off"
+        @click="handleRestoreProxy"
+        class="restore-proxy-button"
+      />
     </q-toolbar>
   </q-header>
 </template>
@@ -142,6 +151,25 @@ async function handleLaunchSafari() {
     isLaunchingSafari.value = false;
   }
 }
+
+async function handleRestoreProxy() {
+  if (!isElectron.value || !window.electronAPI?.restoreSystemProxy) return;
+  try {
+    await window.electronAPI.restoreSystemProxy();
+    $q.notify({
+      type: 'positive',
+      message: 'System proxy restored. Other browsers should work again.',
+      position: 'top',
+      timeout: 3000,
+    });
+  } catch {
+    $q.notify({
+      type: 'negative',
+      message: 'Could not restore proxy',
+      position: 'top',
+    });
+  }
+}
 </script>
 
 <style scoped>
@@ -151,5 +179,9 @@ async function handleLaunchSafari() {
 
 .launch-button {
   margin-right: 8px;
+}
+
+.restore-proxy-button {
+  margin-left: 4px;
 }
 </style>
