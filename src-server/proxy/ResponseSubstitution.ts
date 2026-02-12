@@ -16,15 +16,17 @@
  */
 
 import { logger } from '../logger.js';
-import { sendMimickedContent } from './sendMimickedContent.js';
+import { sendMimickedContent, sendMimickedContentWithBuffer } from './sendMimickedContent.js';
 import { detectContentType } from '../utils/content-type.js';
 import type { InterceptionDecision } from './interception.js';
 import type { MitmProxyContext } from './types.js';
 
+const SUBSTITUTION_FETCH_TIMEOUT_MS = 15_000;
+
 /**
  * Performs response substitution: intercepts response chunks and sends mimicked content instead.
- * Sets up onResponseHeaders (override headers), onResponseData (send body on first chunk, then swallow),
- * and onResponseEnd (just finish). Sending body on first chunk avoids client closing before we write (EPIPE).
+ * Supports both inline content (mapping.content) and substitution by URL (mapping.substitutionUrl).
+ * When substitutionUrl is set, fetches that URL and sends its body; on fetch failure, passes through (callback only).
  */
 export function substituteResponse(
   ctx: MitmProxyContext,
@@ -43,16 +45,115 @@ export function substituteResponse(
     contentType: responseHeaders['content-type'],
   });
 
-  if (!mapping.content) {
-    logger.warn('No mimicked content for mapping', { url: targetUrl, mappingId: mapping.id });
+  const hasInlineContent = (mapping.content?.length ?? 0) > 0;
+  const substitutionUrl = (mapping.substitutionUrl?.trim() ?? '') || null;
+
+  if (!hasInlineContent && !substitutionUrl) {
+    logger.warn('No mimicked content or substitution URL for mapping', {
+      url: targetUrl,
+      mappingId: mapping.id,
+    });
     return callback();
   }
 
-  const contentLength = mapping.content.length;
-  const contentType = detectContentType(mapping.content);
   let bodySent = false;
+  let pendingEndCallback: (() => void) | null = null;
+  let fetchStarted = false;
 
-  // Override headers before the proxy sends writeHead (runs in onResponseHeaders).
+  const runPendingEnd = (): void => {
+    if (pendingEndCallback) {
+      pendingEndCallback();
+      pendingEndCallback = null;
+    }
+  };
+
+  if (substitutionUrl) {
+    const doFetchAndSend = (): void => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), SUBSTITUTION_FETCH_TIMEOUT_MS);
+
+      fetch(substitutionUrl, { signal: controller.signal, headers: { Accept: '*/*' } })
+        .then((res) => {
+          clearTimeout(timeoutId);
+          if (!res.ok) throw new Error(`Substitution URL returned ${res.status}`);
+          return res.arrayBuffer();
+        })
+        .then((ab) => Buffer.from(ab))
+        .then((buf) => {
+          const statusCode = ctx.serverToProxyResponse?.statusCode ?? 200;
+          const headers = ctx.serverToProxyResponse?.headers;
+          sendMimickedContentWithBuffer(
+            ctx.proxyToClientResponse,
+            buf,
+            targetUrl,
+            mapping.id,
+            statusCode,
+            headers
+          );
+          bodySent = true;
+          logger.info('Replaced response with content from substitution URL', {
+            url: targetUrl,
+            mappingId: mapping.id,
+            substitutionUrl,
+          });
+          runPendingEnd();
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          logger.warn('Substitution URL fetch failed, passing through', {
+            url: targetUrl,
+            mappingId: mapping.id,
+            substitutionUrl,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          runPendingEnd();
+        });
+    };
+
+    // Swallow original body: pass empty buffer so the proxy replaces the chunk (passing null would keep the original chunk and forward it).
+    const emptyChunk = Buffer.alloc(0);
+    if (ctx.onResponseHeaders) {
+      ctx.onResponseHeaders((_ctx: MitmProxyContext, headersCallback: () => void) => {
+        const h = _ctx.serverToProxyResponse?.headers;
+        if (h) {
+          delete h['content-length'];
+          delete h['Content-Length'];
+          delete h['content-encoding'];
+          delete h['Content-Encoding'];
+          delete h['transfer-encoding'];
+          delete h['Transfer-Encoding'];
+          h['transfer-encoding'] = 'chunked';
+        }
+        if (typeof headersCallback === 'function') headersCallback();
+      });
+    }
+    ctx.onResponseData((_ctx: MitmProxyContext, _chunk: Buffer, dataCallback: (err: Error | null, chunk: Buffer | null) => void) => {
+      dataCallback(null, emptyChunk);
+      if (bodySent || fetchStarted) return;
+      fetchStarted = true;
+      doFetchAndSend();
+    });
+
+    ctx.onResponseEnd((_ctx: MitmProxyContext, endCallback: () => void) => {
+      if (bodySent) {
+        endCallback();
+        return;
+      }
+      pendingEndCallback = endCallback;
+      if (!fetchStarted) {
+        fetchStarted = true;
+        doFetchAndSend();
+      }
+    });
+
+    callback();
+    return;
+  }
+
+  // Inline content path
+  const contentLength = mapping.content!.length;
+  const contentType = detectContentType(mapping.content!);
+
   if (ctx.onResponseHeaders) {
     ctx.onResponseHeaders((_ctx: MitmProxyContext, headersCallback: () => void) => {
       const h = _ctx.serverToProxyResponse?.headers;
@@ -68,8 +169,6 @@ export function substituteResponse(
     });
   }
 
-  // Send mimicked body on first chunk so client gets data immediately (avoids ECONNRESET/EPIPE).
-  // Subsequent chunks are swallowed (pass null).
   ctx.onResponseData((_ctx: MitmProxyContext, _chunk: Buffer, dataCallback: (err: Error | null, chunk: Buffer | null) => void) => {
     if (!bodySent) {
       bodySent = true;

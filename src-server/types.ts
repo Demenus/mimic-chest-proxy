@@ -37,6 +37,14 @@ export interface ErrorResponse {
   details?: string;
 }
 
+export interface FetchUrlRequest {
+  url: string;
+}
+
+export interface FetchUrlResponse {
+  content: string;
+}
+
 // Extend Express Request to include originalTargetUrl for proxy requests
 declare module 'express-serve-static-core' {
   interface Request {

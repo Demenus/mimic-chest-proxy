@@ -15,11 +15,14 @@
         :selected-url="mimicStore.selectedMappingUrl"
         v-model:content="editorContent"
         v-model:language="editorLanguage"
+        v-model:mode="editorMode"
+        v-model:substitution-url="substitutionUrl"
         :is-saving="mimicStore.isSaving"
         @select="handleSelectMapping"
         @delete="handleDeleteMapping"
         @change="handleContentChange"
         @save="handleSaveContent"
+        @save-substitution="handleSaveSubstitution"
       />
     </div>
   </q-page>
@@ -45,6 +48,16 @@ const editorContent = computed({
 const editorLanguage = computed({
   get: () => mimicStore.editorLanguage,
   set: (value: string) => mimicStore.updateEditorLanguage(value),
+});
+
+const editorMode = computed({
+  get: () => mimicStore.editorMode,
+  set: (value) => mimicStore.updateEditorMode(value),
+});
+
+const substitutionUrl = computed({
+  get: () => mimicStore.substitutionUrl,
+  set: (value: string) => mimicStore.updateSubstitutionUrl(value),
 });
 
 onMounted(async () => {
@@ -80,6 +93,25 @@ async function handleSaveContent() {
     $q.notify({
       type: 'negative',
       message: `Failed to save content: ${error instanceof Error ? error.message : String(error)}`,
+      position: 'top',
+      timeout: 5000,
+    });
+  }
+}
+
+async function handleSaveSubstitution() {
+  try {
+    await mimicStore.saveSubstitutionUrl();
+    $q.notify({
+      type: 'positive',
+      message: 'Substitution URL saved successfully',
+      position: 'top',
+      timeout: 3000,
+    });
+  } catch (error) {
+    $q.notify({
+      type: 'negative',
+      message: `Failed to save substitution URL: ${error instanceof Error ? error.message : String(error)}`,
       position: 'top',
       timeout: 5000,
     });

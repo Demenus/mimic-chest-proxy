@@ -60,7 +60,10 @@ export async function getInterceptionDecision(
   }
 
   const mapping = await finder.findMatchingMappingAsync(targetUrl);
-  if (!mapping?.content || !ctx.serverToProxyResponse?.headers) {
+  const hasReplacement =
+    mapping &&
+    ((mapping.content?.length ?? 0) > 0 || (mapping.substitutionUrl?.trim() ?? '').length > 0);
+  if (!hasReplacement || !ctx.serverToProxyResponse?.headers) {
     return null;
   }
 

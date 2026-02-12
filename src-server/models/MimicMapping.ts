@@ -15,6 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+export type MimicMappingType = 'content' | 'substitution';
+
 /**
  * Common interface for MimicMapping
  * Uses null for JSON compatibility (instead of undefined)
@@ -23,6 +25,7 @@ export interface IMimicMapping {
   id: string;
   pattern: string | null;
   contentLength: number;
+  substitutionUrl?: string | null;
 }
 
 import picomatch from 'picomatch';
@@ -36,18 +39,36 @@ export class MimicMapping implements IMimicMapping {
   private _pattern: string | null = null;
   private _picomatchMatcher: ((str: string) => boolean) | undefined;
   private _persistedContentLength = 0;
+  private _substitutionUrl: string | null = null;
   public content: Buffer | undefined;
 
-  constructor(id: string, pattern?: string | null, content?: Buffer) {
+  constructor(id: string, pattern?: string | null, content?: Buffer, substitutionUrl?: string | null) {
     this.id = id;
     if (pattern) {
       this.setPattern(pattern);
     }
     this.content = content;
+    if (substitutionUrl !== undefined && substitutionUrl !== null) {
+      this._substitutionUrl = substitutionUrl.trim() || null;
+    }
+  }
+
+  get type(): MimicMappingType {
+    return this._substitutionUrl && this._substitutionUrl.length > 0 ? 'substitution' : 'content';
+  }
+
+  get substitutionUrl(): string | null {
+    return this._substitutionUrl;
+  }
+
+  setSubstitutionUrl(url: string | null): void {
+    this._substitutionUrl = url && url.trim() ? url.trim() : null;
   }
 
   get hasContent(): boolean {
-    return (this.content?.length ?? 0) > 0 || this._persistedContentLength > 0;
+    const hasBody = (this.content?.length ?? 0) > 0 || this._persistedContentLength > 0;
+    const hasSubstitutionUrl = (this._substitutionUrl?.trim() ?? '').length > 0;
+    return hasBody || hasSubstitutionUrl;
   }
 
   /**
@@ -103,6 +124,9 @@ export class MimicMapping implements IMimicMapping {
   static fromInterface(data: IMimicMapping): MimicMapping {
     const mapping = new MimicMapping(data.id);
     mapping._persistedContentLength = data.contentLength ?? 0;
+    if (data.substitutionUrl !== undefined && data.substitutionUrl !== null) {
+      mapping._substitutionUrl = String(data.substitutionUrl).trim() || null;
+    }
 
     if (data.pattern) {
       try {
@@ -125,16 +149,22 @@ export class MimicMapping implements IMimicMapping {
     pattern?: string;
     hasContent: boolean;
     contentLength: number;
+    type: MimicMappingType;
+    substitutionUrl?: string | null;
   } {
     const result: {
       id: string;
       pattern?: string;
       hasContent: boolean;
       contentLength: number;
+      type: MimicMappingType;
+      substitutionUrl?: string | null;
     } = {
       id: this.id,
       hasContent: this.hasContent,
       contentLength: this.contentLength,
+      type: this.type,
+      substitutionUrl: this._substitutionUrl,
     };
 
     if (this._pattern !== null) {
@@ -151,11 +181,13 @@ export class MimicMapping implements IMimicMapping {
     id: string;
     pattern?: string;
     content?: Buffer;
+    substitutionUrl?: string | null;
   } {
     const obj: {
       id: string;
       pattern?: string;
       content?: Buffer;
+      substitutionUrl?: string | null;
     } = {
       id: this.id,
     };
@@ -166,6 +198,10 @@ export class MimicMapping implements IMimicMapping {
 
     if (this.content) {
       obj.content = this.content;
+    }
+
+    if (this._substitutionUrl !== null) {
+      obj.substitutionUrl = this._substitutionUrl;
     }
 
     return obj;
