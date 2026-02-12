@@ -15,6 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/// <reference types="vite/client" />
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare namespace NodeJS {
   interface ProcessEnv {
